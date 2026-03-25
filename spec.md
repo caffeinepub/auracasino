@@ -1,28 +1,29 @@
 # AuraCasino
 
 ## Current State
-- Admin dashboard is password-protected (frontend: 'Admin980')
-- Save button calls adminCreateUser which requires AccessControl.isAdmin but actor is anonymous
-- No game history tracking
-- No WhatsApp floating button on home screen
+- AdminPage shows 'All Players' using `adminGetAllUsers()` which returns Internet Identity principal-based users — NOT the username/password users created by the admin.
+- `adminGetStats()` requires admin role in Motoko, so anonymous callers get an error, potentially breaking the admin page.
+- After a successful Save, the 'All Players' table does not refresh to show the newly created user.
+- No backend function returns both username AND password for admin-created accounts.
 
 ## Requested Changes (Diff)
 
 ### Add
-- GameRecord type in backend
-- adminGetGameHistory public query
-- Game History section in AdminPage
-- Floating WhatsApp button on home screen
+- Backend: `UserCredential` type `{ username: Text; password: Text; balance: Nat }`
+- Backend: `adminGetUsersWithPasswords()` query function returning `[UserCredential]` (no auth required — protected by frontend password)
+- Frontend: `useAdminCreatedUsers` hook calling the new function
+- Frontend: 'All Players' table shows `#`, `Username`, `Password`, `Balance` columns
 
 ### Modify
-- Remove AccessControl checks from admin functions
-- Record game history in playerPlay functions
+- Backend: Remove `AccessControl.isAdmin` check from `adminGetStats` and `adminGetAllUsers` (admin dashboard already protected by frontend password 'Admin980')
+- Frontend: After successful Save, invalidate/refetch the new `adminCreatedUsers` query so the table updates immediately
+- Frontend: `AdminPage` 'All Players' section uses the new hook and shows Username + Password
 
 ### Remove
-- Nothing
+- Frontend: Remove the old `useAdminUsers` usage in `AdminPage` for the 'All Players' section
 
 ## Implementation Plan
-1. Update main.mo: GameRecord type, history storage, remove admin principal checks, add history
-2. Update AdminPage.tsx: GameHistorySection
-3. Update GameLobby.tsx: floating WhatsApp button
-4. Update useQueries.ts: useAdminGameHistory hook
+1. Edit `main.mo`: add `UserCredential` type, add `adminGetUsersWithPasswords`, remove auth check from `adminGetStats`
+2. Update `backend.did.d.ts` and `backend.did.js` to expose the new function
+3. Add `useAdminCreatedUsers` to `useQueries.ts`
+4. Update `AdminPage.tsx`: 'All Players' section uses new hook, shows Username + Password; after Save refetch the new query

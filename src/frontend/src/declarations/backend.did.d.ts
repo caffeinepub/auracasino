@@ -35,6 +35,11 @@ export interface PlayerWallet {
   'username' : string,
   'balance' : bigint,
 }
+export interface UserCredential {
+  'username' : string,
+  'password' : string,
+  'balance' : bigint,
+}
 export interface HiLoResult {
   'win' : boolean,
   'message' : string,
@@ -99,6 +104,7 @@ export interface _SERVICE {
   'adminCreateUser' : ActorMethod<[string, string], string>,
   'adminGetAllUsers' : ActorMethod<[], Array<UserStatProfile>>,
   'adminGetCreatedUsers' : ActorMethod<[], Array<string>>,
+  'adminGetUsersWithPasswords' : ActorMethod<[], Array<UserCredential>>,
   'adminGetPlayerWallets' : ActorMethod<[], Array<PlayerWallet>>,
   'adminGetStats' : ActorMethod<[], AdminStats>,
   'adminTopUpUser' : ActorMethod<[Principal, bigint], undefined>,

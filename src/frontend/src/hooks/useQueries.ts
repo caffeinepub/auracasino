@@ -7,6 +7,7 @@ import type {
   UserStatProfile,
 } from "../backend";
 import { usePlayerSession } from "../contexts/PlayerSessionContext";
+import type { UserCredential } from "../declarations/backend.did";
 import { useActor } from "./useActor";
 
 const RED_NUMBERS = new Set([
@@ -102,6 +103,18 @@ export function useAdminPlayerWallets() {
     queryFn: async () => {
       if (!actor) throw new Error("No actor");
       return (actor as any).adminGetPlayerWallets();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAdminCreatedUsers() {
+  const { actor, isFetching } = useActor();
+  return useQuery<UserCredential[]>({
+    queryKey: ["adminCreatedUsers"],
+    queryFn: async () => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).adminGetUsersWithPasswords();
     },
     enabled: !!actor && !isFetching,
   });

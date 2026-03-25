@@ -23,9 +23,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { motion } from "motion/react";
+import React from "react";
 import { useState } from "react";
 import { useActor } from "../hooks/useActor";
 import {
+  useAdminCreatedUsers,
   useAdminGameHistory,
   useAdminPlayerWallets,
   useAdminStats,
@@ -297,6 +299,7 @@ function WalletControlSection() {
 function CreateUserSection() {
   const { actor } = useActor();
   const { refetch: refetchWallets } = useAdminPlayerWallets();
+  const { refetch: refetchCreatedUsers } = useAdminCreatedUsers();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -322,6 +325,7 @@ function CreateUserSection() {
         setUsername("");
         setPassword("");
         refetchWallets();
+        refetchCreatedUsers();
       }
     } catch (_e) {
       setFeedback({
@@ -578,9 +582,123 @@ function GameHistorySection() {
   );
 }
 
+function AllPlayersSection() {
+  const { data: createdUsers, isLoading } = useAdminCreatedUsers();
+  const [showPasswords, setShowPasswords] = React.useState<
+    Record<number, boolean>
+  >({});
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35 }}
+      className="rounded-xl overflow-hidden"
+      style={{ border: "1px solid oklch(0.62 0.13 78 / 0.3)" }}
+    >
+      <div
+        className="px-5 py-4 flex items-center gap-2"
+        style={{
+          background: "oklch(0.12 0 0)",
+          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+        }}
+      >
+        <Users className="w-4 h-4" style={{ color: "oklch(0.85 0.18 85)" }} />
+        <h3
+          className="font-semibold uppercase tracking-wider text-sm"
+          style={{ color: "oklch(0.85 0.18 85)" }}
+        >
+          All Players ({createdUsers ? createdUsers.length : 0})
+        </h3>
+      </div>
+      <div style={{ background: "oklch(0.10 0 0)" }}>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2
+              className="w-5 h-5 animate-spin"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            />
+          </div>
+        ) : createdUsers && createdUsers.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table data-ocid="admin.users.table">
+              <TableHeader>
+                <TableRow style={{ borderColor: "oklch(0.62 0.13 78 / 0.2)" }}>
+                  {["#", "Username", "Password", "Balance (Coins)"].map((h) => (
+                    <TableHead
+                      key={h}
+                      className="text-xs uppercase tracking-wider"
+                      style={{ color: "oklch(0.85 0.18 85)" }}
+                    >
+                      {h}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {createdUsers.map((user, i) => (
+                  <TableRow
+                    key={user.username}
+                    data-ocid={`admin.users.item.${i + 1}`}
+                    style={{ borderColor: "oklch(0.62 0.13 78 / 0.1)" }}
+                  >
+                    <TableCell className="text-muted-foreground text-sm">
+                      {i + 1}
+                    </TableCell>
+                    <TableCell className="font-semibold text-white">
+                      {user.username}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="font-mono text-sm"
+                          style={{ color: "oklch(0.75 0.13 78)" }}
+                        >
+                          {showPasswords[i] ? user.password : "••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowPasswords((p) => ({ ...p, [i]: !p[i] }))
+                          }
+                          className="text-xs px-2 py-0.5 rounded transition-opacity hover:opacity-70"
+                          style={{
+                            background: "oklch(0.18 0.03 85)",
+                            color: "oklch(0.65 0.05 85)",
+                            border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                          }}
+                        >
+                          {showPasswords[i] ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className="font-bold tabular-nums"
+                      style={{ color: "oklch(0.85 0.18 85)" }}
+                    >
+                      {Number(user.balance).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div
+            data-ocid="admin.users.empty_state"
+            className="py-12 text-center text-muted-foreground"
+          >
+            No player accounts created yet. Use 'Create User' above to add your
+            first player.
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function AdminPage() {
   const { data: stats, isLoading: statsLoading } = useAdminStats();
-  const { data: users, isLoading: usersLoading } = useAdminUsers();
 
   const houseProfit = stats ? Number(stats.houseProfit) : 0;
 
@@ -747,100 +865,8 @@ export default function AdminPage() {
       {/* Game History */}
       <GameHistorySection />
 
-      {/* Users table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ border: "1px solid oklch(0.62 0.13 78 / 0.3)" }}
-      >
-        <div
-          className="px-5 py-4 flex items-center gap-2"
-          style={{
-            background: "oklch(0.12 0 0)",
-            borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
-          }}
-        >
-          <Users className="w-4 h-4" style={{ color: "oklch(0.85 0.18 85)" }} />
-          <h3
-            className="font-semibold uppercase tracking-wider text-sm"
-            style={{ color: "oklch(0.85 0.18 85)" }}
-          >
-            All Players
-          </h3>
-        </div>
-        <div style={{ background: "oklch(0.10 0 0)" }}>
-          {usersLoading ? (
-            <div
-              data-ocid="admin.users.loading_state"
-              className="flex items-center justify-center py-12"
-            >
-              <Loader2
-                className="w-5 h-5 animate-spin"
-                style={{ color: "oklch(0.85 0.18 85)" }}
-              />
-            </div>
-          ) : users && users.length > 0 ? (
-            <Table data-ocid="admin.users.table">
-              <TableHeader>
-                <TableRow style={{ borderColor: "oklch(0.62 0.13 78 / 0.2)" }}>
-                  {[
-                    "#",
-                    "Principal",
-                    "Balance",
-                    "Total Wagered",
-                    "Total Won",
-                  ].map((h) => (
-                    <TableHead
-                      key={h}
-                      className="text-xs uppercase tracking-wider"
-                      style={{ color: "oklch(0.85 0.18 85)" }}
-                    >
-                      {h}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user, i) => (
-                  <TableRow
-                    key={user.principal}
-                    data-ocid={`admin.users.item.${i + 1}`}
-                    style={{ borderColor: "oklch(0.62 0.13 78 / 0.1)" }}
-                  >
-                    <TableCell className="text-muted-foreground text-sm">
-                      {i + 1}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {user.principal.slice(0, 10)}...{user.principal.slice(-4)}
-                    </TableCell>
-                    <TableCell
-                      className="font-bold tabular-nums"
-                      style={{ color: "oklch(0.85 0.18 85)" }}
-                    >
-                      {Number(user.balance).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {Number(user.totalWagered).toLocaleString()}
-                    </TableCell>
-                    <TableCell
-                      className="tabular-nums"
-                      style={{ color: "oklch(0.83 0.19 155)" }}
-                    >
-                      {Number(user.totalWon).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div
-              data-ocid="admin.users.empty_state"
-              className="py-12 text-center text-muted-foreground"
-            >
-              No registered players yet
-            </div>
-          )}
-        </div>
-      </div>
+      {/* All Players - admin-created accounts */}
+      <AllPlayersSection />
     </div>
   );
 }

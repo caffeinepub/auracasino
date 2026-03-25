@@ -27,6 +27,12 @@ actor {
     totalWon : Nat;
   };
 
+  public type UserCredential = {
+    username : Text;
+    password : Text;
+    balance : Nat;
+  };
+
   public type GameStats = {
     totalWagered : Nat;
     totalPaidOut : Nat;
@@ -586,17 +592,27 @@ actor {
     { win = payout > 0; payout; newCard; message = "Hi-Lo" };
   };
 
-  public query ({ caller }) func adminGetAllUsers() : async [UserStatProfile] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) { Runtime.trap("Unauthorized") };
+  public query func adminGetAllUsers() : async [UserStatProfile] {
     users.entries().toArray().map(func((principal, profile)) : UserStatProfile {
       { principal = principal.toText(); balance = profile.balance; totalWagered = profile.totalWagered; totalWon = profile.totalWon };
     });
   };
 
-  public query ({ caller }) func adminGetStats() : async AdminStats {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) { Runtime.trap("Unauthorized") };
+  public query func adminGetStats() : async AdminStats {
     { totalUsers = users.size(); totalWagered; totalPaidOut; houseProfit = (totalWagered : Int) - (totalPaidOut : Int);
       rouletteStats; slotsStats; hiloStats; aviatorStats; teenPattiStats };
+  };
+
+  // Admin get all created users with credentials - protected by frontend password
+  public query func adminGetUsersWithPasswords() : async [UserCredential] {
+    let usersArray = createdUsers.toArray();
+    usersArray.map(func((username, password)) : UserCredential {
+      let balance = switch (playerWallets.get(username)) {
+        case (?b) { b };
+        case (null) { 0 };
+      };
+      { username; password; balance };
+    });
   };
 
   public shared ({ caller }) func adminTopUpUser(user : Principal, amount : Nat) : async () {

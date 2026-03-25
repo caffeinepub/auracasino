@@ -49,6 +49,11 @@ export const PlayerWallet = IDL.Record({
   'username' : IDL.Text,
   'balance' : IDL.Nat,
 });
+export const UserCredential = IDL.Record({
+  'username' : IDL.Text,
+  'password' : IDL.Text,
+  'balance' : IDL.Nat,
+});
 export const HiLoResult = IDL.Record({
   'win' : IDL.Bool,
   'message' : IDL.Text,
@@ -100,6 +105,7 @@ export const idlService = IDL.Service({
   'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
   'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'adminGetUsersWithPasswords' : IDL.Func([], [IDL.Vec(UserCredential)], ['query']),
   'adminGetPlayerWallets' : IDL.Func([], [IDL.Vec(PlayerWallet)], ['query']),
   'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
   'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
@@ -229,6 +235,7 @@ export const idlFactory = ({ IDL }) => {
     'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
     'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'adminGetUsersWithPasswords' : IDL.Func([], [IDL.Vec(UserCredential)], ['query']),
     'adminGetPlayerWallets' : IDL.Func([], [IDL.Vec(PlayerWallet)], ['query']),
     'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
     'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
