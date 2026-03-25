@@ -1,0 +1,219 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Deep black luxury palette */
+    --background: 0.07 0 0;
+    --foreground: 0.97 0 0;
+    --card: 0.12 0 0;
+    --card-foreground: 0.97 0 0;
+    --popover: 0.14 0 0;
+    --popover-foreground: 0.97 0 0;
+
+    /* Gold primary */
+    --primary: 0.85 0.18 85;
+    --primary-foreground: 0.08 0 0;
+
+    /* Muted dark */
+    --secondary: 0.17 0 0;
+    --secondary-foreground: 0.85 0 0;
+    --muted: 0.16 0 0;
+    --muted-foreground: 0.55 0 0;
+
+    /* Gold accent */
+    --accent: 0.62 0.13 78;
+    --accent-foreground: 0.07 0 0;
+
+    --destructive: 0.62 0.25 25;
+    --destructive-foreground: 0.97 0 0;
+
+    --border: 0.62 0.13 78;
+    --input: 0.17 0 0;
+    --ring: 0.85 0.18 85;
+
+    /* Win/loss semantic */
+    --win: 0.83 0.19 155;
+    --loss: 0.62 0.25 25;
+
+    --chart-1: 0.85 0.18 85;
+    --chart-2: 0.83 0.19 155;
+    --chart-3: 0.62 0.25 25;
+    --chart-4: 0.62 0.13 78;
+    --chart-5: 0.55 0 0;
+
+    --sidebar: 0.1 0 0;
+    --sidebar-foreground: 0.97 0 0;
+    --sidebar-primary: 0.85 0.18 85;
+    --sidebar-primary-foreground: 0.08 0 0;
+    --sidebar-accent: 0.17 0 0;
+    --sidebar-accent-foreground: 0.97 0 0;
+    --sidebar-border: 0.62 0.13 78;
+    --sidebar-ring: 0.85 0.18 85;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "DM Sans", system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Playfair Display", serif;
+  }
+
+  .gold-glow {
+    text-shadow: 0 0 10px oklch(0.85 0.18 85 / 0.6), 0 0 20px
+      oklch(0.85 0.18 85 / 0.3);
+  }
+
+  .card-glow {
+    box-shadow: 0 0 20px oklch(0.85 0.18 85 / 0.12), inset 0 1px 0
+      oklch(0.85 0.18 85 / 0.08);
+  }
+
+  .card-glow-hover:hover {
+    box-shadow: 0 0 40px oklch(0.85 0.18 85 / 0.3), 0 0 80px
+      oklch(0.85 0.18 85 / 0.1), inset 0 1px 0 oklch(0.85 0.18 85 / 0.15);
+  }
+
+  .gold-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.87 0.19 85) 0%,
+      oklch(0.62 0.13 78) 100%
+    );
+  }
+
+  .gold-gradient-text {
+    background: linear-gradient(
+      135deg,
+      oklch(0.87 0.19 85) 0%,
+      oklch(0.72 0.16 80) 50%,
+      oklch(0.87 0.19 85) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .win-glow {
+    text-shadow: 0 0 12px oklch(0.83 0.19 155 / 0.8);
+    color: oklch(0.83 0.19 155);
+  }
+
+  .loss-glow {
+    text-shadow: 0 0 12px oklch(0.62 0.25 25 / 0.8);
+    color: oklch(0.62 0.25 25);
+  }
+}
+
+@keyframes spin-reel {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-300px);
+  }
+}
+
+@keyframes spin-wheel {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(1800deg);
+  }
+}
+
+@keyframes card-flip {
+  0% {
+    transform: rotateY(0deg);
+  }
+  50% {
+    transform: rotateY(90deg);
+  }
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+@keyframes pulse-gold {
+  0%,
+  100% {
+    box-shadow: 0 0 20px oklch(0.85 0.18 85 / 0.2);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.85 0.18 85 / 0.5), 0 0 60px
+      oklch(0.85 0.18 85 / 0.2);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-spin-wheel {
+  animation: spin-wheel 3s cubic-bezier(0.17, 0.67, 0.12, 0.99) forwards;
+}
+
+.animate-card-flip {
+  animation: card-flip 0.6s ease-in-out;
+}
+
+.animate-pulse-gold {
+  animation: pulse-gold 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.reel-strip {
+  transition: transform 0.8s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(0.1 0 0);
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.62 0.13 78);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.85 0.18 85);
+}
