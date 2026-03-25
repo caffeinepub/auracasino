@@ -27,21 +27,7 @@ export function useActor() {
 
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
-
-      // Initialize access control (first-time admin assignment)
       await actor._initializeAccessControlWithSecret(adminToken);
-
-      // Force-claim admin for this II principal using the token.
-      // This reassigns admin even if a different principal held it before,
-      // ensuring the current II-authenticated user always gets full access.
-      if (adminToken) {
-        try {
-          await (actor as any).forceClaimAdmin(adminToken);
-        } catch (_) {
-          // Silently ignore — token may be wrong or not configured
-        }
-      }
-
       return actor;
     },
     // Only refetch when identity changes
