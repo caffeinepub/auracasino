@@ -7,12 +7,12 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Random "mo:core/Random";
-import Migration "migration";
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 // Use migration to add createdUsers to persistent state
-(with migration = Migration.run)
+
 actor {
   // Type definitions
   public type UserProfile = {
