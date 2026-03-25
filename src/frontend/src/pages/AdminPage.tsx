@@ -12,6 +12,7 @@ import {
 import {
   BarChart3,
   DollarSign,
+  History,
   Loader2,
   Minus,
   Plus,
@@ -25,10 +26,12 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useActor } from "../hooks/useActor";
 import {
+  useAdminGameHistory,
   useAdminPlayerWallets,
   useAdminStats,
   useAdminUsers,
 } from "../hooks/useQueries";
+import type { GameRecord } from "../hooks/useQueries";
 
 function StatCard({
   icon: Icon,
@@ -293,6 +296,7 @@ function WalletControlSection() {
 
 function CreateUserSection() {
   const { actor } = useActor();
+  const { refetch: refetchWallets } = useAdminPlayerWallets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -317,6 +321,7 @@ function CreateUserSection() {
       if (success) {
         setUsername("");
         setPassword("");
+        refetchWallets();
       }
     } catch (_e) {
       setFeedback({
@@ -443,6 +448,130 @@ function CreateUserSection() {
           >
             {feedback.message}
           </motion.p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function GameHistorySection() {
+  const { data: history, isLoading } = useAdminGameHistory();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="rounded-xl mb-8 overflow-hidden"
+      style={{ border: "1px solid oklch(0.62 0.13 78 / 0.3)" }}
+    >
+      <div
+        className="px-5 py-4 flex items-center gap-2"
+        style={{
+          background: "oklch(0.12 0 0)",
+          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+        }}
+      >
+        <History className="w-4 h-4" style={{ color: "oklch(0.85 0.18 85)" }} />
+        <h3
+          className="font-semibold uppercase tracking-wider text-sm"
+          style={{ color: "oklch(0.85 0.18 85)" }}
+        >
+          Game History
+        </h3>
+      </div>
+      <div style={{ background: "oklch(0.10 0 0)" }}>
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2
+              className="w-6 h-6 animate-spin"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            />
+          </div>
+        ) : !history || history.length === 0 ? (
+          <div
+            data-ocid="admin.game_history.empty_state"
+            className="py-12 text-center text-muted-foreground"
+          >
+            No game history yet
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow
+                  style={{
+                    borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+                  }}
+                >
+                  {[
+                    "#",
+                    "Player",
+                    "Game",
+                    "Wager",
+                    "Payout",
+                    "Result",
+                    "Time",
+                  ].map((h) => (
+                    <TableHead
+                      key={h}
+                      className="text-xs uppercase tracking-wider"
+                      style={{ color: "oklch(0.85 0.18 85)" }}
+                    >
+                      {h}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((record: GameRecord, idx: number) => {
+                  const rowKey = `${record.username}-${record.game}-${String(record.timestamp)}`;
+                  const ms = Number(record.timestamp) / 1_000_000;
+                  const timeStr = new Date(ms).toLocaleString();
+                  return (
+                    <TableRow
+                      key={rowKey}
+                      data-ocid={`admin.game_history.item.${idx + 1}`}
+                      style={{
+                        borderBottom: "1px solid oklch(0.62 0.13 78 / 0.1)",
+                      }}
+                    >
+                      <TableCell className="text-muted-foreground text-sm">
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell className="text-white font-medium">
+                        {record.username}
+                      </TableCell>
+                      <TableCell className="text-white capitalize">
+                        {record.game}
+                      </TableCell>
+                      <TableCell className="text-white">
+                        {Number(record.wager).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-white">
+                        {Number(record.payout).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className="text-sm font-semibold"
+                          style={{
+                            color: record.win
+                              ? "oklch(0.83 0.19 155)"
+                              : "oklch(0.72 0.25 25)",
+                          }}
+                        >
+                          {record.win ? "Win" : "Loss"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {timeStr}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
     </motion.div>
@@ -614,6 +743,9 @@ export default function AdminPage() {
 
       {/* Wallet Control */}
       <WalletControlSection />
+
+      {/* Game History */}
+      <GameHistorySection />
 
       {/* Users table */}
       <div

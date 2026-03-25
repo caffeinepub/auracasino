@@ -8,6 +8,7 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Random "mo:core/Random";
 import Prim "mo:prim";
+import Time "mo:core/Time";
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
@@ -106,6 +107,15 @@ actor {
     balance : Nat;
   };
 
+  public type GameRecord = {
+    username : Text;
+    game : Text;
+    wager : Nat;
+    payout : Nat;
+    win : Bool;
+    timestamp : Int;
+  };
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -113,6 +123,8 @@ actor {
   let createdUsers = Map.empty<Text, Text>();
   // Player wallets keyed by username
   let playerWallets = Map.empty<Text, Nat>();
+  // Game history (last 500 records)
+  var gameHistory : [GameRecord] = [];
 
   let initialBalance = 1000;
   // II-based wallets (legacy)
@@ -125,6 +137,16 @@ actor {
   var hiloStats : GameStats = { totalWagered = 0; totalPaidOut = 0; playCount = 0 };
   var aviatorStats : GameStats = { totalWagered = 0; totalPaidOut = 0; playCount = 0 };
   var teenPattiStats : GameStats = { totalWagered = 0; totalPaidOut = 0; playCount = 0 };
+
+  func addGameRecord(record : GameRecord) {
+    let maxRecords = 500;
+    let current = gameHistory;
+    let currentSize = current.size();
+    let newSize = if (currentSize < maxRecords) { currentSize + 1 } else { maxRecords };
+    gameHistory := Array.tabulate<GameRecord>(newSize, func(i) {
+      if (i == 0) { record } else { current[i - 1] }
+    });
+  };
 
   func getUserOrRegister(caller : Principal) : UserProfile {
     switch (users.get(caller)) {
@@ -204,6 +226,7 @@ actor {
     totalWagered += wager;
     totalPaidOut += payout;
     rouletteStats := updateGameStats(rouletteStats, wager, payout);
+    addGameRecord({ username; game = "Roulette"; wager; payout; win = payout > 0; timestamp = Time.now() });
     { win = payout > 0; payout; result = rng; message = "Roulette result: " # rng.toText() };
   };
 
@@ -221,6 +244,7 @@ actor {
     totalWagered += totalBetWager;
     totalPaidOut += totalPayout;
     rouletteStats := updateGameStats(rouletteStats, totalBetWager, totalPayout);
+    addGameRecord({ username; game = "Roulette"; wager = totalBetWager; payout = totalPayout; win = totalPayout > 0; timestamp = Time.now() });
     { win = totalPayout > 0; totalPayout; result = rng; message = "Roulette result: " # rng.toText() };
   };
 
@@ -238,6 +262,7 @@ actor {
     totalWagered += wager;
     totalPaidOut += payout;
     aviatorStats := updateGameStats(aviatorStats, wager, payout);
+    addGameRecord({ username; game = "Aviator"; wager; payout; win; timestamp = Time.now() });
     let msg = if (win) { "Cashed out at " # (targetMultiplierX100 / 100).toText() # "." # (targetMultiplierX100 % 100).toText() # "x!" }
               else { "Crashed at " # (rng / 100).toText() # "." # (rng % 100).toText() # "x" };
     { win; payout; crashPoint = rng; message = msg };
@@ -263,6 +288,7 @@ actor {
     totalWagered += wager;
     totalPaidOut += payout;
     teenPattiStats := updateGameStats(teenPattiStats, wager, payout);
+    addGameRecord({ username; game = "Teen Patti"; wager; payout; win; timestamp = Time.now() });
     let handName = func(r : Nat) : Text {
       if (r == 5) { "Trail" } else if (r == 4) { "Pure Sequence" } else if (r == 3) { "Sequence" } else if (r == 2) { "Color" } else if (r == 1) { "Pair" } else { "High Card" };
     };
@@ -271,11 +297,8 @@ actor {
     { win; payout; playerCards = [p1, p2, p3]; dealerCards = [d1, d2, d3]; playerRank; dealerRank; message = msg };
   };
 
-  // Admin wallet control
-  public query ({ caller }) func adminGetPlayerWallets() : async [PlayerWallet] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized");
-    };
+  // Admin wallet control - no principal auth (protected by frontend password)
+  public query func adminGetPlayerWallets() : async [PlayerWallet] {
     let usersArray = createdUsers.toArray();
     usersArray.map(func((username, _)) : PlayerWallet {
       let balance = switch (playerWallets.get(username)) {
@@ -286,10 +309,7 @@ actor {
     });
   };
 
-  public shared ({ caller }) func adminAdjustBalance(username : Text, amount : Nat, isAdd : Bool) : async Text {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized");
-    };
+  public shared func adminAdjustBalance(username : Text, amount : Nat, isAdd : Bool) : async Text {
     if (not createdUsers.containsKey(username)) {
       return "User not found";
     };
@@ -303,6 +323,25 @@ actor {
     "Balance updated: " # username # " now has " # newBalance.toText() # " coins";
   };
 
+  // Admin creates a player account - no principal auth (protected by frontend password)
+  public shared func adminCreateUser(username : Text, password : Text) : async Text {
+    if (createdUsers.containsKey(username)) { return "Username already exists" };
+    createdUsers.add(username, password);
+    playerWallets.add(username, initialBalance);
+    "User created successfully";
+  };
+
+  public query func adminGetCreatedUsers() : async [Text] {
+    let usersArray = createdUsers.toArray();
+    let sortedUsers = usersArray.sort(func(a, b) { Text.compare(a.0, b.0) });
+    sortedUsers.map(func((username, _)) { username });
+  };
+
+  // Admin get game history - no principal auth (protected by frontend password)
+  public query func adminGetGameHistory() : async [GameRecord] {
+    gameHistory;
+  };
+
   // Force claim admin using the admin token
   public shared ({ caller }) func forceClaimAdmin(secret : Text) : async Text {
     switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
@@ -314,26 +353,6 @@ actor {
         "Admin role granted successfully";
       };
     };
-  };
-
-  // Admin creates a player account; wallet initialized to 1000
-  public shared ({ caller }) func adminCreateUser(username : Text, password : Text) : async Text {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can create users");
-    };
-    if (createdUsers.containsKey(username)) { return "Username already exists" };
-    createdUsers.add(username, password);
-    playerWallets.add(username, initialBalance);
-    "User created successfully";
-  };
-
-  public query ({ caller }) func adminGetCreatedUsers() : async [Text] {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized");
-    };
-    let usersArray = createdUsers.toArray();
-    let sortedUsers = usersArray.sort(func(a, b) { Text.compare(a.0, b.0) });
-    sortedUsers.map(func((username, _)) { username });
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -476,7 +495,8 @@ actor {
   func sortThreeNat(a : Nat, b : Nat, c : Nat) : (Nat, Nat, Nat) {
     let lo = minNat(a, minNat(b, c));
     let hi = maxNat(a, maxNat(b, c));
-    let mid = a + b + c - lo - hi;
+    let sum = a + b + c;
+    let mid = sum - (lo + hi);
     (lo, mid, hi);
   };
 
@@ -491,7 +511,7 @@ actor {
     let isTrail = r1 == r2 and r2 == r3;
     let isPair = r1 == r2 or r2 == r3 or r1 == r3;
     let (lo, mid, hi) = sortThreeNat(r1, r2, r3);
-    let isSeq = (hi - lo == 2 and mid - lo == 1) or (lo == 0 and mid == 11 and hi == 12);
+    let isSeq = (hi >= lo and hi - lo == 2 and mid >= lo and mid - lo == 1) or (lo == 0 and mid == 11 and hi == 12);
     if (isTrail) { 5 }
     else if (isFlush and isSeq) { 4 }
     else if (isSeq) { 3 }
@@ -575,7 +595,7 @@ actor {
 
   public query ({ caller }) func adminGetStats() : async AdminStats {
     if (not (AccessControl.isAdmin(accessControlState, caller))) { Runtime.trap("Unauthorized") };
-    { totalUsers = users.size(); totalWagered; totalPaidOut; houseProfit = totalWagered - totalPaidOut;
+    { totalUsers = users.size(); totalWagered; totalPaidOut; houseProfit = (totalWagered : Int) - (totalPaidOut : Int);
       rouletteStats; slotsStats; hiloStats; aviatorStats; teenPattiStats };
   };
 

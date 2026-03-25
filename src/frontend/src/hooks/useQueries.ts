@@ -107,6 +107,27 @@ export function useAdminPlayerWallets() {
   });
 }
 
+export interface GameRecord {
+  username: string;
+  game: string;
+  wager: bigint;
+  payout: bigint;
+  win: boolean;
+  timestamp: bigint;
+}
+
+export function useAdminGameHistory() {
+  const { actor, isFetching } = useActor();
+  return useQuery<GameRecord[]>({
+    queryKey: ["adminGameHistory"],
+    queryFn: async () => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).adminGetGameHistory();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 15000,
+  });
+}
 export function useTopUp() {
   const { actor } = useActor();
   const queryClient = useQueryClient();

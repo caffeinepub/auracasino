@@ -1,23 +1,28 @@
 # AuraCasino
 
 ## Current State
-Admin dashboard at `/admin` with stat cards, per-game stats, and player list. Backend uses Internet Identity auth. No username/password creation exists.
+- Admin dashboard is password-protected (frontend: 'Admin980')
+- Save button calls adminCreateUser which requires AccessControl.isAdmin but actor is anonymous
+- No game history tracking
+- No WhatsApp floating button on home screen
 
 ## Requested Changes (Diff)
 
 ### Add
-- `adminCreateUser(username, password)` backend function storing credentials, returning error if taken
-- Create User section in AdminPage.tsx with Username/Password inputs and Save button
-- Success/error feedback
+- GameRecord type in backend
+- adminGetGameHistory public query
+- Game History section in AdminPage
+- Floating WhatsApp button on home screen
 
 ### Modify
-- `AdminPage.tsx` — add Create User section above All Players table
-- `main.mo` — add createdUsers map and adminCreateUser function
+- Remove AccessControl checks from admin functions
+- Record game history in playerPlay functions
 
 ### Remove
 - Nothing
 
 ## Implementation Plan
-1. Add CreatedUser type and createdUsers stable map to main.mo
-2. Add adminCreateUser(username, password) with admin-only guard
-3. Add Create User form UI to AdminPage.tsx matching gold/black luxury theme
+1. Update main.mo: GameRecord type, history storage, remove admin principal checks, add history
+2. Update AdminPage.tsx: GameHistorySection
+3. Update GameLobby.tsx: floating WhatsApp button
+4. Update useQueries.ts: useAdminGameHistory hook
