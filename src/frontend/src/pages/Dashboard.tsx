@@ -1,27 +1,13 @@
-import { Award, ChevronLeft, Target, TrendingUp } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { Award, Target, TrendingUp } from "lucide-react";
+import { motion } from "motion/react";
 import GameLobby from "../components/GameLobby";
-import AviatorGame from "../components/games/AviatorGame";
-import RouletteGame from "../components/games/RouletteGame";
-import TeenPattiGame from "../components/games/TeenPattiGame";
 import { useUserInfo } from "../hooks/useQueries";
-
-type SelectedGame = "aviator" | "roulette" | "teenpatti" | null;
-
-const GAME_LABELS: Record<NonNullable<SelectedGame>, string> = {
-  aviator: "Aviator",
-  roulette: "Roulette",
-  teenpatti: "Teen Patti",
-};
 
 export default function Dashboard() {
   const { data: userInfo } = useUserInfo();
-  const [selectedGame, setSelectedGame] = useState<SelectedGame>(null);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Stats row */}
       {userInfo && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -81,53 +67,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Content area */}
-      <AnimatePresence mode="wait">
-        {selectedGame === null ? (
-          <motion.div
-            key="lobby"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <GameLobby onSelect={setSelectedGame} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key={selectedGame}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.35 }}
-          >
-            {/* Back button */}
-            <div className="mb-6">
-              <button
-                type="button"
-                data-ocid="lobby.back_button"
-                onClick={() => setSelectedGame(null)}
-                className="flex items-center gap-2 text-sm uppercase tracking-widest transition-all hover:opacity-100 opacity-75"
-                style={{ color: "oklch(0.85 0.18 85)" }}
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Back to Lobby
-                <span className="text-muted-foreground normal-case tracking-normal mx-2">
-                  |
-                </span>
-                <span className="font-display font-bold text-base">
-                  {GAME_LABELS[selectedGame]}
-                </span>
-              </button>
-            </div>
-
-            {/* Game component */}
-            {selectedGame === "aviator" && <AviatorGame />}
-            {selectedGame === "roulette" && <RouletteGame />}
-            {selectedGame === "teenpatti" && <TeenPattiGame />}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <GameLobby />
     </div>
   );
 }

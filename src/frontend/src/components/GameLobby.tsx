@@ -1,10 +1,17 @@
-import { motion } from "motion/react";
+import { ChevronLeft } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
+import AviatorGame from "./games/AviatorGame";
+import RouletteGame from "./games/RouletteGame";
+import TeenPattiGame from "./games/TeenPattiGame";
 
 type Game = "aviator" | "roulette" | "teenpatti";
 
-interface GameLobbyProps {
-  onSelect: (game: Game) => void;
-}
+const GAME_LABELS: Record<Game, string> = {
+  aviator: "Aviator",
+  roulette: "Roulette",
+  teenpatti: "Teen Patti",
+};
 
 const STARS = [
   [20, 20],
@@ -590,88 +597,132 @@ const GAMES: {
   },
 ];
 
-export default function GameLobby({ onSelect }: GameLobbyProps) {
+export default function GameLobby() {
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+
   return (
     <div className="w-full">
-      <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-10"
-      >
-        <h2 className="font-display text-4xl md:text-5xl font-bold gold-gradient-text tracking-widest uppercase mb-2">
-          Game Lobby
-        </h2>
-        <p className="text-muted-foreground text-sm tracking-widest uppercase">
-          Choose your game — fortune favors the bold
-        </p>
-      </motion.div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-        {GAMES.map((game, i) => (
-          <motion.button
-            key={game.id}
-            type="button"
-            data-ocid={`lobby.${game.id}.button`}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: 0.15 + i * 0.12,
-              duration: 0.5,
-              ease: "easeOut",
-            }}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onSelect(game.id)}
-            className="group relative flex flex-col items-center rounded-2xl overflow-hidden cursor-pointer text-left w-full transition-all duration-300"
-            style={{
-              background: "oklch(0.10 0 0)",
-              border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-              boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.border =
-                "1px solid oklch(0.85 0.18 85 / 0.7)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                "0 0 40px oklch(0.85 0.18 85 / 0.25), 0 8px 32px oklch(0 0 0 / 0.5)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.border =
-                "1px solid oklch(0.62 0.13 78 / 0.3)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                "0 4px 24px oklch(0 0 0 / 0.4)";
-            }}
+      <AnimatePresence mode="wait">
+        {selectedGame === null ? (
+          <motion.div
+            key="lobby"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
           >
-            <div
-              className="w-full"
-              style={{ height: "200px", background: "oklch(0.08 0 0)" }}
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-center mb-10"
             >
-              {game.svg}
-            </div>
-            <div
-              className="w-full px-6 py-5 flex flex-col items-center"
-              style={{ borderTop: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
-            >
-              <h3 className="font-display text-2xl font-bold uppercase tracking-widest mb-1 gold-gradient-text">
-                {game.title}
-              </h3>
-              <p className="text-sm text-muted-foreground tracking-wider">
-                {game.subtitle}
+              <h2 className="font-display text-4xl md:text-5xl font-bold gold-gradient-text tracking-widest uppercase mb-2">
+                Game Lobby
+              </h2>
+              <p className="text-muted-foreground text-sm tracking-widest uppercase">
+                Choose your game — fortune favors the bold
               </p>
-              <div
-                className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70"
-                style={{
-                  background:
-                    "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                  color: "oklch(0.07 0 0)",
-                }}
-              >
-                Play Now
-              </div>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {GAMES.map((game, i) => (
+                <motion.button
+                  key={game.id}
+                  type="button"
+                  data-ocid={`lobby.${game.id}.button`}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    delay: 0.15 + i * 0.12,
+                    duration: 0.5,
+                    ease: "easeOut",
+                  }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedGame(game.id)}
+                  className="group relative flex flex-col items-center rounded-2xl overflow-hidden cursor-pointer text-left w-full transition-all duration-300"
+                  style={{
+                    background: "oklch(0.10 0 0)",
+                    border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                    boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.border =
+                      "1px solid oklch(0.85 0.18 85 / 0.7)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                      "0 0 40px oklch(0.85 0.18 85 / 0.25), 0 8px 32px oklch(0 0 0 / 0.5)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.border =
+                      "1px solid oklch(0.62 0.13 78 / 0.3)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                      "0 4px 24px oklch(0 0 0 / 0.4)";
+                  }}
+                >
+                  <div
+                    className="w-full"
+                    style={{ height: "200px", background: "oklch(0.08 0 0)" }}
+                  >
+                    {game.svg}
+                  </div>
+                  <div
+                    className="w-full px-6 py-5 flex flex-col items-center"
+                    style={{ borderTop: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
+                  >
+                    <h3 className="font-display text-2xl font-bold uppercase tracking-widest mb-1 gold-gradient-text">
+                      {game.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground tracking-wider">
+                      {game.subtitle}
+                    </p>
+                    <div
+                      className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+                        color: "oklch(0.07 0 0)",
+                      }}
+                    >
+                      Play Now
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
             </div>
-          </motion.button>
-        ))}
-      </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={selectedGame}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35 }}
+          >
+            <div className="mb-6">
+              <button
+                type="button"
+                data-ocid="lobby.back_button"
+                onClick={() => setSelectedGame(null)}
+                className="flex items-center gap-2 text-sm uppercase tracking-widest transition-all hover:opacity-100 opacity-75"
+                style={{ color: "oklch(0.85 0.18 85)" }}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back to Lobby
+                <span className="text-muted-foreground normal-case tracking-normal mx-2">
+                  |
+                </span>
+                <span className="font-display font-bold text-base">
+                  {GAME_LABELS[selectedGame]}
+                </span>
+              </button>
+            </div>
+            {selectedGame === "aviator" && <AviatorGame />}
+            {selectedGame === "roulette" && <RouletteGame />}
+            {selectedGame === "teenpatti" && <TeenPattiGame />}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
