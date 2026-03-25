@@ -199,7 +199,7 @@ actor {
   };
 
   // Player login
-  public query func playerLogin(username : Text, password : Text) : async LoginResult {
+  public shared func playerLogin(username : Text, password : Text) : async LoginResult {
     let (valid, balance) = validatePlayer(username, password);
     if (valid) {
       { success = true; balance; message = "Login successful" };
@@ -210,7 +210,7 @@ actor {
     };
   };
 
-  public query func playerGetBalance(username : Text, password : Text) : async Nat {
+  public shared func playerGetBalance(username : Text, password : Text) : async Nat {
     let (valid, balance) = validatePlayer(username, password);
     if (not valid) { Runtime.trap("Invalid credentials") };
     balance;

@@ -15,6 +15,8 @@ export interface AdminStats {
   'slotsStats' : GameStats,
   'houseProfit' : bigint,
   'hiloStats' : GameStats,
+  'aviatorStats' : GameStats,
+  'teenPattiStats' : GameStats,
   'totalWagered' : bigint,
   'totalPaidOut' : bigint,
   'totalUsers' : bigint,
@@ -23,6 +25,15 @@ export interface GameStats {
   'totalWagered' : bigint,
   'totalPaidOut' : bigint,
   'playCount' : bigint,
+}
+export interface LoginResult {
+  'success' : boolean,
+  'balance' : bigint,
+  'message' : string,
+}
+export interface PlayerWallet {
+  'username' : string,
+  'balance' : bigint,
 }
 export interface HiLoResult {
   'win' : boolean,
@@ -41,6 +52,21 @@ export interface PlayResult {
   'result' : bigint,
   'message' : string,
   'payout' : bigint,
+}
+export interface AviatorResult {
+  'win' : boolean,
+  'payout' : bigint,
+  'crashPoint' : bigint,
+  'message' : string,
+}
+export interface TeenPattiResult {
+  'win' : boolean,
+  'payout' : bigint,
+  'playerCards' : Array<bigint>,
+  'dealerCards' : Array<bigint>,
+  'playerRank' : bigint,
+  'dealerRank' : bigint,
+  'message' : string,
 }
 export interface RouletteBet {
   'betType' : string,
@@ -69,23 +95,34 @@ export interface UserStatProfile {
 }
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'adminAdjustBalance' : ActorMethod<[string, bigint, boolean], string>,
   'adminCreateUser' : ActorMethod<[string, string], string>,
   'adminGetAllUsers' : ActorMethod<[], Array<UserStatProfile>>,
   'adminGetCreatedUsers' : ActorMethod<[], Array<string>>,
+  'adminGetPlayerWallets' : ActorMethod<[], Array<PlayerWallet>>,
   'adminGetStats' : ActorMethod<[], AdminStats>,
   'adminTopUpUser' : ActorMethod<[Principal, bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'drawCard' : ActorMethod<[], bigint>,
+  'forceClaimAdmin' : ActorMethod<[string], string>,
   'getBalance' : ActorMethod<[], bigint>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getUserInfo' : ActorMethod<[], UserProfile>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'playerGetBalance' : ActorMethod<[string, string], bigint>,
+  'playerLogin' : ActorMethod<[string, string], LoginResult>,
+  'playerPlayAviator' : ActorMethod<[string, string, bigint, bigint], AviatorResult>,
+  'playerPlayRoulette' : ActorMethod<[string, string, bigint, string, bigint], PlayResult>,
+  'playerPlayRouletteMulti' : ActorMethod<[string, string, Array<RouletteBet>], MultiPlayResult>,
+  'playerPlayTeenPatti' : ActorMethod<[string, string, bigint], TeenPattiResult>,
+  'playAviator' : ActorMethod<[bigint, bigint], AviatorResult>,
   'playHiLo' : ActorMethod<[bigint, string, bigint], HiLoResult>,
   'playRoulette' : ActorMethod<[bigint, string, bigint], PlayResult>,
   'playRouletteMulti' : ActorMethod<[Array<RouletteBet>], MultiPlayResult>,
   'playSlots' : ActorMethod<[bigint], SlotsResult>,
+  'playTeenPatti' : ActorMethod<[bigint], TeenPattiResult>,
   'register' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'topUp' : ActorMethod<[bigint], undefined>,

@@ -3,7 +3,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FFD700" />
-    <meta name="description" content="AuraCasino — Premium luxury gaming platform with Roulette, Slots, and Hi-Lo card games" />
+    <meta name="description" content="AuraCasino — Premium luxury gaming platform with Roulette, Aviator, and Teen Patti" />
     <title>AuraCasino — Premium Gaming</title>
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" href="/assets/generated/aura-icon.dim_512x512.png" />
@@ -14,8 +14,28 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').catch(function() {});
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            // Check for a waiting SW (new version downloaded in background)
+            reg.addEventListener('updatefound', function () {
+              var newWorker = reg.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', function () {
+                // New SW installed and waiting — force activate
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            });
+          }).catch(function () {});
+
+          // When the SW sends SW_UPDATED, reload the page to get the latest build
+          navigator.serviceWorker.addEventListener('message', function (event) {
+            if (event.data && event.data.type === 'SW_UPDATED') {
+              // Small delay so the SW finishes activating first
+              setTimeout(function () { window.location.reload(); }, 200);
+            }
+          });
         });
       }
     </script>

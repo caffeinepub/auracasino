@@ -24,6 +24,8 @@ export const AdminStats = IDL.Record({
   'slotsStats' : GameStats,
   'houseProfit' : IDL.Int,
   'hiloStats' : GameStats,
+  'aviatorStats' : GameStats,
+  'teenPattiStats' : GameStats,
   'totalWagered' : IDL.Nat,
   'totalPaidOut' : IDL.Nat,
   'totalUsers' : IDL.Nat,
@@ -37,6 +39,15 @@ export const UserProfile = IDL.Record({
   'balance' : IDL.Nat,
   'totalWagered' : IDL.Nat,
   'totalWon' : IDL.Nat,
+});
+export const LoginResult = IDL.Record({
+  'success' : IDL.Bool,
+  'balance' : IDL.Nat,
+  'message' : IDL.Text,
+});
+export const PlayerWallet = IDL.Record({
+  'username' : IDL.Text,
+  'balance' : IDL.Nat,
 });
 export const HiLoResult = IDL.Record({
   'win' : IDL.Bool,
@@ -67,16 +78,34 @@ export const SlotsResult = IDL.Record({
   'reels' : IDL.Vec(IDL.Nat),
   'payout' : IDL.Nat,
 });
+export const AviatorResult = IDL.Record({
+  'win' : IDL.Bool,
+  'payout' : IDL.Nat,
+  'crashPoint' : IDL.Nat,
+  'message' : IDL.Text,
+});
+export const TeenPattiResult = IDL.Record({
+  'win' : IDL.Bool,
+  'payout' : IDL.Nat,
+  'playerCards' : IDL.Vec(IDL.Nat),
+  'dealerCards' : IDL.Vec(IDL.Nat),
+  'playerRank' : IDL.Nat,
+  'dealerRank' : IDL.Nat,
+  'message' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'adminAdjustBalance' : IDL.Func([IDL.Text, IDL.Nat, IDL.Bool], [IDL.Text], []),
   'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
   'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'adminGetPlayerWallets' : IDL.Func([], [IDL.Vec(PlayerWallet)], ['query']),
   'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
   'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'drawCard' : IDL.Func([], [IDL.Nat], []),
+  'forceClaimAdmin' : IDL.Func([IDL.Text], [IDL.Text], []),
   'getBalance' : IDL.Func([], [IDL.Nat], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -87,12 +116,21 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'playerGetBalance' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+  'playerLogin' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
+  'playerPlayAviator' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [AviatorResult], []),
+  'playerPlayRoulette' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
+  'playerPlayRouletteMulti' : IDL.Func([IDL.Text, IDL.Text, IDL.Vec(RouletteBet)], [MultiPlayResult], []),
+  'playerPlayTeenPatti' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat], [TeenPattiResult], []),
+  'playAviator' : IDL.Func([IDL.Nat, IDL.Nat], [AviatorResult], []),
   'playHiLo' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [HiLoResult], []),
   'playRoulette' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
   'playRouletteMulti' : IDL.Func([IDL.Vec(RouletteBet)], [MultiPlayResult], []),
   'playSlots' : IDL.Func([IDL.Nat], [SlotsResult], []),
+  'playTeenPatti' : IDL.Func([IDL.Nat], [TeenPattiResult], []),
   'register' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'adminGetGameHistory' : IDL.Func([], [IDL.Vec(IDL.Record({'username': IDL.Text, 'game': IDL.Text, 'wager': IDL.Nat, 'payout': IDL.Nat, 'win': IDL.Bool, 'timestamp': IDL.Int}))], ['query']),
   'topUp' : IDL.Func([IDL.Nat], [], []),
 });
 
@@ -115,6 +153,8 @@ export const idlFactory = ({ IDL }) => {
     'slotsStats' : GameStats,
     'houseProfit' : IDL.Int,
     'hiloStats' : GameStats,
+    'aviatorStats' : GameStats,
+    'teenPattiStats' : GameStats,
     'totalWagered' : IDL.Nat,
     'totalPaidOut' : IDL.Nat,
     'totalUsers' : IDL.Nat,
@@ -128,6 +168,15 @@ export const idlFactory = ({ IDL }) => {
     'balance' : IDL.Nat,
     'totalWagered' : IDL.Nat,
     'totalWon' : IDL.Nat,
+  });
+  const LoginResult = IDL.Record({
+    'success' : IDL.Bool,
+    'balance' : IDL.Nat,
+    'message' : IDL.Text,
+  });
+  const PlayerWallet = IDL.Record({
+    'username' : IDL.Text,
+    'balance' : IDL.Nat,
   });
   const HiLoResult = IDL.Record({
     'win' : IDL.Bool,
@@ -158,16 +207,34 @@ export const idlFactory = ({ IDL }) => {
     'reels' : IDL.Vec(IDL.Nat),
     'payout' : IDL.Nat,
   });
-  
+  const AviatorResult = IDL.Record({
+    'win' : IDL.Bool,
+    'payout' : IDL.Nat,
+    'crashPoint' : IDL.Nat,
+    'message' : IDL.Text,
+  });
+  const TeenPattiResult = IDL.Record({
+    'win' : IDL.Bool,
+    'payout' : IDL.Nat,
+    'playerCards' : IDL.Vec(IDL.Nat),
+    'dealerCards' : IDL.Vec(IDL.Nat),
+    'playerRank' : IDL.Nat,
+    'dealerRank' : IDL.Nat,
+    'message' : IDL.Text,
+  });
+
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'adminAdjustBalance' : IDL.Func([IDL.Text, IDL.Nat, IDL.Bool], [IDL.Text], []),
     'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
     'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'adminGetPlayerWallets' : IDL.Func([], [IDL.Vec(PlayerWallet)], ['query']),
     'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
     'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'drawCard' : IDL.Func([], [IDL.Nat], []),
+    'forceClaimAdmin' : IDL.Func([IDL.Text], [IDL.Text], []),
     'getBalance' : IDL.Func([], [IDL.Nat], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
@@ -178,17 +245,22 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'playerGetBalance' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
+    'playerLogin' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
+    'playerPlayAviator' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [AviatorResult], []),
+    'playerPlayRoulette' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
+    'playerPlayRouletteMulti' : IDL.Func([IDL.Text, IDL.Text, IDL.Vec(RouletteBet)], [MultiPlayResult], []),
+    'playerPlayTeenPatti' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat], [TeenPattiResult], []),
+    'playAviator' : IDL.Func([IDL.Nat, IDL.Nat], [AviatorResult], []),
     'playHiLo' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [HiLoResult], []),
     'playRoulette' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
-    'playRouletteMulti' : IDL.Func(
-        [IDL.Vec(RouletteBet)],
-        [MultiPlayResult],
-        [],
-      ),
+    'playRouletteMulti' : IDL.Func([IDL.Vec(RouletteBet)], [MultiPlayResult], []),
     'playSlots' : IDL.Func([IDL.Nat], [SlotsResult], []),
+    'playTeenPatti' : IDL.Func([IDL.Nat], [TeenPattiResult], []),
     'register' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'topUp' : IDL.Func([IDL.Nat], [], []),
+    'adminGetGameHistory' : IDL.Func([], [IDL.Vec(IDL.Record({'username': IDL.Text, 'game': IDL.Text, 'wager': IDL.Nat, 'payout': IDL.Nat, 'win': IDL.Bool, 'timestamp': IDL.Int}))], ['query']),
+  'topUp' : IDL.Func([IDL.Nat], [], []),
   });
 };
 
