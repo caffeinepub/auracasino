@@ -25,7 +25,9 @@ const STAR_POSITIONS = [
   { x: 290, y: 56 },
 ];
 
-export default function AviatorGame() {
+export default function AviatorGame({
+  onRequireLogin,
+}: { onRequireLogin?: () => void }) {
   const { session } = usePlayerSession();
   const playAviator = usePlayerPlayAviator();
 
@@ -57,6 +59,10 @@ export default function AviatorGame() {
 
   async function handleFly() {
     if (gameState !== "idle") return;
+    if (!session) {
+      onRequireLogin?.();
+      return;
+    }
     setResult(null);
     setDisplayMultiplier(1.0);
     setGameState("flying");

@@ -196,7 +196,9 @@ interface TeenPattiResult {
 
 type GameState = "idle" | "dealing" | "result";
 
-export default function TeenPattiGame() {
+export default function TeenPattiGame({
+  onRequireLogin,
+}: { onRequireLogin?: () => void }) {
   const { session } = usePlayerSession();
   const playTeenPatti = usePlayerPlayTeenPatti();
 
@@ -208,6 +210,10 @@ export default function TeenPattiGame() {
 
   async function handleDeal() {
     if (gameState !== "idle") return;
+    if (!session) {
+      onRequireLogin?.();
+      return;
+    }
     setResult(null);
     setGameState("dealing");
     try {

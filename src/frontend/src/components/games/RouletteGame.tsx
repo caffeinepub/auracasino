@@ -76,7 +76,10 @@ function numCellBg(n: number, selected: boolean, winning: boolean): string {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function RouletteGame() {
+export default function RouletteGame({
+  onRequireLogin,
+}: { onRequireLogin?: () => void }) {
+  const { session } = usePlayerSession();
   const [chipValue, setChipValue] = useState(10);
   const [bets, setBets] = useState<Map<BetKey, number>>(new Map());
   const [spinning, setSpinning] = useState(false);
@@ -111,6 +114,10 @@ export default function RouletteGame() {
   async function handleSpin() {
     if (bets.size === 0) {
       toast.error("Place at least one bet before spinning!");
+      return;
+    }
+    if (!session) {
+      onRequireLogin?.();
       return;
     }
     setSpinning(true);
