@@ -30,11 +30,22 @@ export interface HiLoResult {
   'newCard' : bigint,
   'payout' : bigint,
 }
+export interface MultiPlayResult {
+  'win' : boolean,
+  'result' : bigint,
+  'message' : string,
+  'totalPayout' : bigint,
+}
 export interface PlayResult {
   'win' : boolean,
   'result' : bigint,
   'message' : string,
   'payout' : bigint,
+}
+export interface RouletteBet {
+  'betType' : string,
+  'betValue' : bigint,
+  'wager' : bigint,
 }
 export interface SlotsResult {
   'win' : boolean,
@@ -58,7 +69,9 @@ export interface UserStatProfile {
 }
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'adminCreateUser' : ActorMethod<[string, string], string>,
   'adminGetAllUsers' : ActorMethod<[], Array<UserStatProfile>>,
+  'adminGetCreatedUsers' : ActorMethod<[], Array<string>>,
   'adminGetStats' : ActorMethod<[], AdminStats>,
   'adminTopUpUser' : ActorMethod<[Principal, bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
@@ -71,6 +84,7 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'playHiLo' : ActorMethod<[bigint, string, bigint], HiLoResult>,
   'playRoulette' : ActorMethod<[bigint, string, bigint], PlayResult>,
+  'playRouletteMulti' : ActorMethod<[Array<RouletteBet>], MultiPlayResult>,
   'playSlots' : ActorMethod<[bigint], SlotsResult>,
   'register' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,

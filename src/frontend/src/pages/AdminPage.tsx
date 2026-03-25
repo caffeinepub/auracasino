@@ -1,3 +1,6 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -12,9 +15,12 @@ import {
   Loader2,
   TrendingDown,
   TrendingUp,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
+import { useActor } from "../hooks/useActor";
 import { useAdminStats, useAdminUsers, useIsAdmin } from "../hooks/useQueries";
 
 function StatCard({
@@ -57,6 +63,164 @@ function StatCard({
       </p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
+  );
+}
+
+function CreateUserSection() {
+  const { actor } = useActor();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    success: boolean;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setFeedback(null);
+    if (!username.trim() || !password.trim()) {
+      setError("Both username and password are required.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const result = await actor!.adminCreateUser(username.trim(), password);
+      const success = result.toLowerCase().includes("success");
+      setFeedback({ message: result, success });
+      if (success) {
+        setUsername("");
+        setPassword("");
+      }
+    } catch (_e) {
+      setFeedback({
+        message: "An error occurred. Please try again.",
+        success: false,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+      className="rounded-xl mb-8 overflow-hidden"
+      style={{ border: "1px solid oklch(0.62 0.13 78 / 0.3)" }}
+    >
+      <div
+        className="px-5 py-4 flex items-center gap-2"
+        style={{
+          background: "oklch(0.12 0 0)",
+          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+        }}
+      >
+        <UserPlus
+          className="w-4 h-4"
+          style={{ color: "oklch(0.85 0.18 85)" }}
+        />
+        <h3
+          className="font-semibold uppercase tracking-wider text-sm"
+          style={{ color: "oklch(0.85 0.18 85)" }}
+        >
+          Create User
+        </h3>
+      </div>
+      <div className="p-6" style={{ background: "oklch(0.10 0 0)" }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-lg">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="create-user-username"
+              className="text-xs uppercase tracking-wider"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Username
+            </Label>
+            <Input
+              id="create-user-username"
+              data-ocid="admin.create_user.input"
+              type="text"
+              placeholder="Enter username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="bg-transparent border-[oklch(0.62_0.13_78_/_0.3)] focus:border-[oklch(0.85_0.18_85)] focus:ring-[oklch(0.85_0.18_85_/_0.2)] text-white placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="create-user-password"
+              className="text-xs uppercase tracking-wider"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Password
+            </Label>
+            <Input
+              id="create-user-password"
+              data-ocid="admin.create_user.textarea"
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="bg-transparent border-[oklch(0.62_0.13_78_/_0.3)] focus:border-[oklch(0.85_0.18_85)] focus:ring-[oklch(0.85_0.18_85_/_0.2)] text-white placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p
+            data-ocid="admin.create_user.error_state"
+            className="mt-3 text-sm"
+            style={{ color: "oklch(0.72 0.25 25)" }}
+          >
+            {error}
+          </p>
+        )}
+
+        <Button
+          data-ocid="admin.create_user.submit_button"
+          onClick={handleSave}
+          disabled={saving || !actor}
+          className="mt-5 font-semibold uppercase tracking-wider text-sm px-8"
+          style={{
+            background: "oklch(0.85 0.18 85)",
+            color: "oklch(0.10 0 0)",
+            border: "none",
+          }}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              Saving…
+            </>
+          ) : (
+            "Save"
+          )}
+        </Button>
+
+        {feedback && (
+          <motion.p
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            data-ocid={
+              feedback.success
+                ? "admin.create_user.success_state"
+                : "admin.create_user.error_state"
+            }
+            className="mt-4 text-sm font-medium"
+            style={{
+              color: feedback.success
+                ? "oklch(0.83 0.19 155)"
+                : "oklch(0.72 0.25 25)",
+            }}
+          >
+            {feedback.message}
+          </motion.p>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -241,6 +405,9 @@ export default function AdminPage() {
           </div>
         </>
       ) : null}
+
+      {/* Create User */}
+      <CreateUserSection />
 
       {/* Users table */}
       <div

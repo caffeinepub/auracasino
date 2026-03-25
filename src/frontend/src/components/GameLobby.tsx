@@ -610,22 +610,9 @@ export default function GameLobby() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
+            className="min-h-[calc(100vh-64px)] flex flex-col justify-center px-4 py-8"
           >
-            <motion.div
-              initial={{ opacity: 0, y: -16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-10"
-            >
-              <h2 className="font-display text-4xl md:text-5xl font-bold gold-gradient-text tracking-widest uppercase mb-2">
-                Game Lobby
-              </h2>
-              <p className="text-muted-foreground text-sm tracking-widest uppercase">
-                Choose your game — fortune favors the bold
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto w-full">
               {GAMES.map((game, i) => (
                 <motion.button
                   key={game.id}
@@ -662,7 +649,7 @@ export default function GameLobby() {
                 >
                   <div
                     className="w-full"
-                    style={{ height: "200px", background: "oklch(0.08 0 0)" }}
+                    style={{ height: "260px", background: "oklch(0.08 0 0)" }}
                   >
                     {game.svg}
                   </div>
@@ -698,6 +685,7 @@ export default function GameLobby() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.35 }}
+            className="px-4 py-6"
           >
             <div className="mb-6">
               <button

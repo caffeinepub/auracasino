@@ -18,6 +18,11 @@ export interface SlotsResult {
     reels: Array<bigint>;
     payout: bigint;
 }
+export interface RouletteBet {
+    betType: string;
+    betValue: bigint;
+    wager: bigint;
+}
 export interface AdminStats {
     rouletteStats: GameStats;
     slotsStats: GameStats;
@@ -39,22 +44,17 @@ export interface PlayResult {
     message: string;
     payout: bigint;
 }
-export interface RouletteBet {
-    betType: string;
-    betValue: bigint;
-    wager: bigint;
+export interface HiLoResult {
+    win: boolean;
+    message: string;
+    newCard: bigint;
+    payout: bigint;
 }
 export interface MultiPlayResult {
     win: boolean;
     result: bigint;
     message: string;
     totalPayout: bigint;
-}
-export interface HiLoResult {
-    win: boolean;
-    message: string;
-    newCard: bigint;
-    payout: bigint;
 }
 export interface UserProfile {
     balance: bigint;
@@ -67,7 +67,9 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
+    adminCreateUser(username: string, password: string): Promise<string>;
     adminGetAllUsers(): Promise<Array<UserStatProfile>>;
+    adminGetCreatedUsers(): Promise<Array<string>>;
     adminGetStats(): Promise<AdminStats>;
     adminTopUpUser(user: Principal, amount: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;

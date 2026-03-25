@@ -7,9 +7,12 @@ import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Random "mo:core/Random";
+import Migration "migration";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
+// Use migration to add createdUsers to persistent state
+(with migration = Migration.run)
 actor {
   // Type definitions
   public type UserProfile = {
@@ -79,7 +82,10 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // State variables
+  // New state variable
+  let createdUsers = Map.empty<Text, Text>();
+
+  // Legacy state variables
   let initialBalance = 1000;
   let users = Map.empty<Principal, UserProfile>();
   var totalWagered : Nat = 0;
@@ -129,6 +135,35 @@ actor {
       totalPaidOut = stats.totalPaidOut + payout;
       playCount = stats.playCount + 1;
     };
+  };
+
+  // Created user functions
+  public shared ({ caller }) func adminCreateUser(username : Text, password : Text) : async Text {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can create users");
+    };
+
+    if (createdUsers.containsKey(username)) {
+      return "Username already exists";
+    };
+
+    createdUsers.add(username, password);
+    "User created successfully";
+  };
+
+  public query ({ caller }) func adminGetCreatedUsers() : async [Text] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can get created users");
+    };
+
+    let usersArray = createdUsers.toArray();
+    let sortedUsers = usersArray.sort(
+      func(a, b) {
+        Text.compare(a.0, b.0);
+      }
+    );
+    let mappedUsers = sortedUsers.map(func((username, _)) { username });
+    mappedUsers;
   };
 
   // Required profile management functions

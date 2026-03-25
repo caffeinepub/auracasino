@@ -50,6 +50,17 @@ export const PlayResult = IDL.Record({
   'message' : IDL.Text,
   'payout' : IDL.Nat,
 });
+export const RouletteBet = IDL.Record({
+  'betType' : IDL.Text,
+  'betValue' : IDL.Nat,
+  'wager' : IDL.Nat,
+});
+export const MultiPlayResult = IDL.Record({
+  'win' : IDL.Bool,
+  'result' : IDL.Nat,
+  'message' : IDL.Text,
+  'totalPayout' : IDL.Nat,
+});
 export const SlotsResult = IDL.Record({
   'win' : IDL.Bool,
   'message' : IDL.Text,
@@ -59,7 +70,9 @@ export const SlotsResult = IDL.Record({
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
+  'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
   'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
@@ -76,6 +89,7 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'playHiLo' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [HiLoResult], []),
   'playRoulette' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
+  'playRouletteMulti' : IDL.Func([IDL.Vec(RouletteBet)], [MultiPlayResult], []),
   'playSlots' : IDL.Func([IDL.Nat], [SlotsResult], []),
   'register' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
@@ -127,6 +141,17 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'payout' : IDL.Nat,
   });
+  const RouletteBet = IDL.Record({
+    'betType' : IDL.Text,
+    'betValue' : IDL.Nat,
+    'wager' : IDL.Nat,
+  });
+  const MultiPlayResult = IDL.Record({
+    'win' : IDL.Bool,
+    'result' : IDL.Nat,
+    'message' : IDL.Text,
+    'totalPayout' : IDL.Nat,
+  });
   const SlotsResult = IDL.Record({
     'win' : IDL.Bool,
     'message' : IDL.Text,
@@ -136,7 +161,9 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'adminCreateUser' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'adminGetAllUsers' : IDL.Func([], [IDL.Vec(UserStatProfile)], ['query']),
+    'adminGetCreatedUsers' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'adminGetStats' : IDL.Func([], [AdminStats], ['query']),
     'adminTopUpUser' : IDL.Func([IDL.Principal, IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
@@ -153,6 +180,11 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'playHiLo' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [HiLoResult], []),
     'playRoulette' : IDL.Func([IDL.Nat, IDL.Text, IDL.Nat], [PlayResult], []),
+    'playRouletteMulti' : IDL.Func(
+        [IDL.Vec(RouletteBet)],
+        [MultiPlayResult],
+        [],
+      ),
     'playSlots' : IDL.Func([IDL.Nat], [SlotsResult], []),
     'register' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),

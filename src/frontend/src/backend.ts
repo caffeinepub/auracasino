@@ -100,6 +100,11 @@ export interface SlotsResult {
     reels: Array<bigint>;
     payout: bigint;
 }
+export interface RouletteBet {
+    betType: string;
+    betValue: bigint;
+    wager: bigint;
+}
 export interface AdminStats {
     rouletteStats: GameStats;
     slotsStats: GameStats;
@@ -127,6 +132,12 @@ export interface HiLoResult {
     newCard: bigint;
     payout: bigint;
 }
+export interface MultiPlayResult {
+    win: boolean;
+    result: bigint;
+    message: string;
+    totalPayout: bigint;
+}
 export interface UserProfile {
     balance: bigint;
     totalWagered: bigint;
@@ -139,7 +150,9 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    adminCreateUser(username: string, password: string): Promise<string>;
     adminGetAllUsers(): Promise<Array<UserStatProfile>>;
+    adminGetCreatedUsers(): Promise<Array<string>>;
     adminGetStats(): Promise<AdminStats>;
     adminTopUpUser(user: Principal, amount: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -152,6 +165,7 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     playHiLo(wager: bigint, guess: string, currentCard: bigint): Promise<HiLoResult>;
     playRoulette(wager: bigint, betType: string, betValue: bigint): Promise<PlayResult>;
+    playRouletteMulti(bets: Array<RouletteBet>): Promise<MultiPlayResult>;
     playSlots(wager: bigint): Promise<SlotsResult>;
     register(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -174,6 +188,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async adminCreateUser(arg0: string, arg1: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminCreateUser(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminCreateUser(arg0, arg1);
+            return result;
+        }
+    }
     async adminGetAllUsers(): Promise<Array<UserStatProfile>> {
         if (this.processError) {
             try {
@@ -185,6 +213,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.adminGetAllUsers();
+            return result;
+        }
+    }
+    async adminGetCreatedUsers(): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminGetCreatedUsers();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminGetCreatedUsers();
             return result;
         }
     }
@@ -353,6 +395,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.playRoulette(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async playRouletteMulti(arg0: Array<RouletteBet>): Promise<MultiPlayResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.playRouletteMulti(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.playRouletteMulti(arg0);
             return result;
         }
     }
