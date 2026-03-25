@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import RouletteGame from "./games/RouletteGame";
 
-type Game = "roulette";
+type Game = "aviator" | "roulette" | "teenPatti";
 
 const WHEEL_SEGMENTS = [
   {
@@ -193,70 +193,379 @@ const WHEEL_SEGMENTS = [
   },
 ] as const;
 
-const ROULETTE_CARD = {
-  id: "roulette" as Game,
-  title: "ROULETTE",
-  subtitle: "Bet on your number",
-  svg: (
-    <svg
-      viewBox="0 0 200 160"
-      className="w-full h-full"
-      aria-label="Roulette wheel"
+const AviatorSVG = (
+  <svg
+    viewBox="0 0 200 160"
+    className="w-full h-full"
+    aria-label="Aviator game"
+  >
+    <title>Aviator</title>
+    <defs>
+      <radialGradient id="av-bg" cx="50%" cy="80%" r="70%">
+        <stop offset="0%" stopColor="oklch(0.10 0.04 240)" />
+        <stop offset="100%" stopColor="oklch(0.06 0 0)" />
+      </radialGradient>
+      <linearGradient id="av-curve" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="oklch(0.85 0.18 85)" stopOpacity="0.1" />
+        <stop offset="100%" stopColor="oklch(0.85 0.18 85)" stopOpacity="0.8" />
+      </linearGradient>
+      <linearGradient id="av-gold" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="oklch(0.62 0.13 78)" />
+        <stop offset="100%" stopColor="oklch(0.87 0.19 85)" />
+      </linearGradient>
+      <filter id="av-glow">
+        <feGaussianBlur stdDeviation="2" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+    <rect width="200" height="160" fill="url(#av-bg)" />
+    {/* Static stars - no array map needed */}
+    <circle cx="20" cy="20" r="1" fill="white" opacity="0.4" />
+    <circle cx="50" cy="10" r="1" fill="white" opacity="0.6" />
+    <circle cx="80" cy="30" r="1" fill="white" opacity="0.8" />
+    <circle cx="120" cy="15" r="1" fill="white" opacity="0.4" />
+    <circle cx="160" cy="25" r="1" fill="white" opacity="0.6" />
+    <circle cx="185" cy="10" r="1" fill="white" opacity="0.8" />
+    <circle cx="170" cy="50" r="1" fill="white" opacity="0.4" />
+    <circle cx="30" cy="50" r="1" fill="white" opacity="0.6" />
+    <circle cx="140" cy="40" r="1" fill="white" opacity="0.8" />
+    {/* Trajectory curve fill */}
+    <path
+      d="M10,145 Q60,140 100,110 Q140,80 185,25 L185,155 L10,155 Z"
+      fill="oklch(0.85 0.18 85 / 0.06)"
+    />
+    {/* Trajectory curve line */}
+    <path
+      d="M10,145 Q60,140 100,110 Q140,80 185,25"
+      fill="none"
+      stroke="url(#av-curve)"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+    />
+    {/* Glow on curve */}
+    <path
+      d="M10,145 Q60,140 100,110 Q140,80 185,25"
+      fill="none"
+      stroke="oklch(0.85 0.18 85 / 0.3)"
+      strokeWidth="5"
+      filter="url(#av-glow)"
+    />
+    {/* Airplane */}
+    <g transform="translate(175, 28) rotate(-35)">
+      <ellipse cx="0" cy="0" rx="10" ry="4" fill="url(#av-gold)" />
+      <ellipse cx="7" cy="-1" rx="4" ry="2.5" fill="oklch(0.90 0.15 85)" />
+      <polygon points="-2,-4 -8,-12 -12,-4" fill="oklch(0.75 0.16 82)" />
+      <polygon points="-2,4 -8,12 -12,4" fill="oklch(0.75 0.16 82)" />
+      <polygon points="-9,-2 -14,-7 -10,-2" fill="oklch(0.62 0.13 78)" />
+    </g>
+    {/* Multiplier text */}
+    <text
+      x="18"
+      y="75"
+      fontFamily="monospace"
+      fontSize="22"
+      fontWeight="bold"
+      fill="oklch(0.87 0.19 85)"
+      opacity="0.9"
     >
-      <title>Roulette</title>
-      <defs>
-        <radialGradient id="rl-bg" cx="50%" cy="50%" r="60%">
-          <stop offset="0%" stopColor="oklch(0.16 0.04 78)" />
-          <stop offset="100%" stopColor="oklch(0.08 0 0)" />
-        </radialGradient>
-        <radialGradient id="rl-rim" cx="50%" cy="50%" r="50%">
-          <stop offset="80%" stopColor="oklch(0.62 0.13 78)" />
-          <stop offset="100%" stopColor="oklch(0.85 0.18 85)" />
-        </radialGradient>
-      </defs>
-      <rect width="200" height="160" fill="url(#rl-bg)" />
-      <circle
-        cx="100"
-        cy="80"
-        r="72"
+      2.47x
+    </text>
+    {/* Grid lines */}
+    <line
+      x1="10"
+      y1="155"
+      x2="190"
+      y2="155"
+      stroke="oklch(0.85 0.18 85 / 0.15)"
+      strokeWidth="1"
+    />
+    <line
+      x1="10"
+      y1="155"
+      x2="10"
+      y2="10"
+      stroke="oklch(0.85 0.18 85 / 0.15)"
+      strokeWidth="1"
+    />
+  </svg>
+);
+
+const RouletteSVG = (
+  <svg
+    viewBox="0 0 200 160"
+    className="w-full h-full"
+    aria-label="Roulette wheel"
+  >
+    <title>Roulette</title>
+    <defs>
+      <radialGradient id="rl-bg" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stopColor="oklch(0.16 0.04 78)" />
+        <stop offset="100%" stopColor="oklch(0.08 0 0)" />
+      </radialGradient>
+      <radialGradient id="rl-rim" cx="50%" cy="50%" r="50%">
+        <stop offset="80%" stopColor="oklch(0.62 0.13 78)" />
+        <stop offset="100%" stopColor="oklch(0.85 0.18 85)" />
+      </radialGradient>
+    </defs>
+    <rect width="200" height="160" fill="url(#rl-bg)" />
+    <circle
+      cx="100"
+      cy="80"
+      r="72"
+      fill="none"
+      stroke="oklch(0.85 0.18 85 / 0.3)"
+      strokeWidth="4"
+    />
+    <circle cx="100" cy="80" r="68" fill="url(#rl-rim)" />
+    {WHEEL_SEGMENTS.map((seg) => (
+      <path
+        key={`seg-${seg.num}`}
+        d={seg.d}
+        fill={seg.color}
+        stroke="oklch(0.85 0.18 85 / 0.4)"
+        strokeWidth="0.5"
+      />
+    ))}
+    <circle
+      cx="100"
+      cy="80"
+      r="18"
+      fill="oklch(0.10 0 0)"
+      stroke="oklch(0.85 0.18 85)"
+      strokeWidth="2"
+    />
+    <circle cx="100" cy="80" r="10" fill="oklch(0.85 0.18 85)" opacity="0.9" />
+    <circle cx="100" cy="80" r="4" fill="oklch(0.07 0 0)" />
+    <circle cx="138" cy="50" r="5" fill="white" />
+    <circle cx="138" cy="50" r="3" fill="oklch(0.95 0.05 85)" />
+  </svg>
+);
+
+const TeenPattiSVG = (
+  <svg
+    viewBox="0 0 200 160"
+    className="w-full h-full"
+    aria-label="Teen Patti cards"
+  >
+    <title>Teen Patti</title>
+    <defs>
+      <radialGradient id="tp-bg" cx="50%" cy="50%" r="70%">
+        <stop offset="0%" stopColor="oklch(0.14 0.04 30)" />
+        <stop offset="100%" stopColor="oklch(0.07 0 0)" />
+      </radialGradient>
+      <linearGradient id="tp-card1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="oklch(0.96 0.01 85)" />
+        <stop offset="100%" stopColor="oklch(0.88 0.03 80)" />
+      </linearGradient>
+      <linearGradient id="tp-card2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="oklch(0.94 0.01 85)" />
+        <stop offset="100%" stopColor="oklch(0.86 0.03 80)" />
+      </linearGradient>
+      <linearGradient id="tp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="oklch(0.87 0.19 85)" />
+        <stop offset="100%" stopColor="oklch(0.62 0.13 78)" />
+      </linearGradient>
+    </defs>
+    <rect width="200" height="160" fill="url(#tp-bg)" />
+    <circle cx="100" cy="80" r="90" fill="oklch(0.10 0.03 145 / 0.25)" />
+    <circle
+      cx="100"
+      cy="80"
+      r="70"
+      fill="none"
+      stroke="oklch(0.85 0.18 85 / 0.08)"
+      strokeWidth="1"
+    />
+    {/* Left card */}
+    <g transform="translate(68, 80) rotate(-18)">
+      <rect
+        x="-22"
+        y="-34"
+        width="44"
+        height="60"
+        rx="4"
+        ry="4"
+        fill="url(#tp-card1)"
+        stroke="oklch(0.62 0.13 78 / 0.5)"
+        strokeWidth="1"
+      />
+      <text
+        x="-16"
+        y="-20"
+        fontSize="12"
+        fontWeight="bold"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+      >
+        A
+      </text>
+      <text
+        x="-8"
+        y="-8"
+        fontSize="16"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+      >
+        {"\u2665"}
+      </text>
+      <text
+        x="4"
+        y="22"
+        fontSize="12"
+        fontWeight="bold"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+        transform="rotate(180, 4, 14)"
+      >
+        A
+      </text>
+    </g>
+    {/* Right card */}
+    <g transform="translate(132, 80) rotate(18)">
+      <rect
+        x="-22"
+        y="-34"
+        width="44"
+        height="60"
+        rx="4"
+        ry="4"
+        fill="url(#tp-card2)"
+        stroke="oklch(0.62 0.13 78 / 0.5)"
+        strokeWidth="1"
+      />
+      <text
+        x="-16"
+        y="-20"
+        fontSize="12"
+        fontWeight="bold"
+        fill="#1a1a2e"
+        fontFamily="Georgia, serif"
+      >
+        K
+      </text>
+      <text
+        x="-8"
+        y="-8"
+        fontSize="16"
+        fill="#1a1a2e"
+        fontFamily="Georgia, serif"
+      >
+        {"\u2660"}
+      </text>
+      <text
+        x="4"
+        y="22"
+        fontSize="12"
+        fontWeight="bold"
+        fill="#1a1a2e"
+        fontFamily="Georgia, serif"
+        transform="rotate(180, 4, 14)"
+      >
+        K
+      </text>
+    </g>
+    {/* Center card */}
+    <g transform="translate(100, 78)">
+      <rect
+        x="-24"
+        y="-36"
+        width="48"
+        height="66"
+        rx="5"
+        ry="5"
+        fill="oklch(0.97 0.01 85)"
+        stroke="oklch(0.85 0.18 85)"
+        strokeWidth="1.5"
+      />
+      <rect
+        x="-20"
+        y="-32"
+        width="40"
+        height="58"
+        rx="3"
+        ry="3"
         fill="none"
         stroke="oklch(0.85 0.18 85 / 0.3)"
-        strokeWidth="4"
+        strokeWidth="0.5"
       />
-      <circle cx="100" cy="80" r="68" fill="url(#rl-rim)" />
-      {WHEEL_SEGMENTS.map((seg) => (
-        <path
-          key={`seg-${seg.num}`}
-          d={seg.d}
-          fill={seg.color}
-          stroke="oklch(0.85 0.18 85 / 0.4)"
-          strokeWidth="0.5"
-        />
-      ))}
-      <circle
-        cx="100"
-        cy="80"
-        r="18"
-        fill="oklch(0.10 0 0)"
-        stroke="oklch(0.85 0.18 85)"
-        strokeWidth="2"
-      />
-      <circle
-        cx="100"
-        cy="80"
-        r="10"
-        fill="oklch(0.85 0.18 85)"
-        opacity="0.9"
-      />
-      <circle cx="100" cy="80" r="4" fill="oklch(0.07 0 0)" />
-      <circle cx="138" cy="50" r="5" fill="white" />
-      <circle cx="138" cy="50" r="3" fill="oklch(0.95 0.05 85)" />
-    </svg>
-  ),
-};
+      <text
+        x="-17"
+        y="-18"
+        fontSize="13"
+        fontWeight="bold"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+      >
+        Q
+      </text>
+      <text
+        x="-9"
+        y="-4"
+        fontSize="18"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+      >
+        {"\u2666"}
+      </text>
+      <text
+        x="5"
+        y="26"
+        fontSize="13"
+        fontWeight="bold"
+        fill="#c41e3a"
+        fontFamily="Georgia, serif"
+        transform="rotate(180, 5, 18)"
+      >
+        Q
+      </text>
+    </g>
+    {/* Gold chip */}
+    <circle
+      cx="100"
+      cy="135"
+      r="12"
+      fill="url(#tp-gold)"
+      stroke="oklch(0.97 0.03 85)"
+      strokeWidth="1.5"
+    />
+    <text
+      x="100"
+      y="139"
+      textAnchor="middle"
+      fontSize="8"
+      fontWeight="bold"
+      fill="oklch(0.10 0 0)"
+      fontFamily="sans-serif"
+    >
+      500
+    </text>
+  </svg>
+);
+
+const GAME_CARDS = [
+  {
+    id: "aviator" as Game,
+    title: "AVIATOR",
+    subtitle: "Cash out before it flies away",
+    svg: AviatorSVG,
+  },
+  {
+    id: "roulette" as Game,
+    title: "ROULETTE",
+    subtitle: "Bet on your number",
+    svg: RouletteSVG,
+  },
+  {
+    id: "teenPatti" as Game,
+    title: "TEEN PATTI",
+    subtitle: "Three cards, infinite glory",
+    svg: TeenPattiSVG,
+  },
+];
 
 export default function GameLobby() {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const selectedCard = GAME_CARDS.find((c) => c.id === selectedGame);
 
   return (
     <div className="w-full">
@@ -270,63 +579,74 @@ export default function GameLobby() {
             transition={{ duration: 0.3 }}
             className="min-h-[calc(100vh-64px)] flex flex-col justify-center px-4 py-8"
           >
-            <div className="max-w-sm mx-auto w-full">
-              <motion.button
-                type="button"
-                data-ocid="lobby.roulette.button"
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15, duration: 0.5, ease: "easeOut" }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedGame(ROULETTE_CARD.id)}
-                className="group relative flex flex-col items-center rounded-2xl overflow-hidden cursor-pointer text-left w-full transition-all duration-300"
-                style={{
-                  background: "oklch(0.10 0 0)",
-                  border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-                  boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.border =
-                    "1px solid oklch(0.85 0.18 85 / 0.7)";
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    "0 0 40px oklch(0.85 0.18 85 / 0.25), 0 8px 32px oklch(0 0 0 / 0.5)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.border =
-                    "1px solid oklch(0.62 0.13 78 / 0.3)";
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    "0 4px 24px oklch(0 0 0 / 0.4)";
-                }}
-              >
-                <div
-                  className="w-full"
-                  style={{ height: "260px", background: "oklch(0.08 0 0)" }}
-                >
-                  {ROULETTE_CARD.svg}
-                </div>
-                <div
-                  className="w-full px-6 py-5 flex flex-col items-center"
-                  style={{ borderTop: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
-                >
-                  <h3 className="font-display text-2xl font-bold uppercase tracking-widest mb-1 gold-gradient-text">
-                    {ROULETTE_CARD.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground tracking-wider">
-                    {ROULETTE_CARD.subtitle}
-                  </p>
-                  <div
-                    className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70"
+            <div className="max-w-5xl mx-auto w-full">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {GAME_CARDS.map((card, index) => (
+                  <motion.button
+                    key={card.id}
+                    type="button"
+                    data-ocid={`lobby.${card.id}.button`}
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: 0.1 + index * 0.12,
+                      duration: 0.5,
+                      ease: "easeOut",
+                    }}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedGame(card.id)}
+                    className="group relative flex flex-col items-center rounded-2xl overflow-hidden cursor-pointer text-left w-full transition-all duration-300"
                     style={{
-                      background:
-                        "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                      color: "oklch(0.07 0 0)",
+                      background: "oklch(0.10 0 0)",
+                      border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                      boxShadow: "0 4px 24px oklch(0 0 0 / 0.4)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.border =
+                        "1px solid oklch(0.85 0.18 85 / 0.7)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                        "0 0 40px oklch(0.85 0.18 85 / 0.25), 0 8px 32px oklch(0 0 0 / 0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.border =
+                        "1px solid oklch(0.62 0.13 78 / 0.3)";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                        "0 4px 24px oklch(0 0 0 / 0.4)";
                     }}
                   >
-                    Play Now
-                  </div>
-                </div>
-              </motion.button>
+                    <div
+                      className="w-full"
+                      style={{ height: "220px", background: "oklch(0.08 0 0)" }}
+                    >
+                      {card.svg}
+                    </div>
+                    <div
+                      className="w-full px-6 py-5 flex flex-col items-center"
+                      style={{
+                        borderTop: "1px solid oklch(0.62 0.13 78 / 0.2)",
+                      }}
+                    >
+                      <h3 className="font-display text-2xl font-bold uppercase tracking-widest mb-1 gold-gradient-text">
+                        {card.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground tracking-wider">
+                        {card.subtitle}
+                      </p>
+                      <div
+                        className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+                          color: "oklch(0.07 0 0)",
+                        }}
+                      >
+                        {card.id === "roulette" ? "Play Now" : "Coming Soon"}
+                      </div>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
             </div>
           </motion.div>
         ) : (
@@ -352,11 +672,44 @@ export default function GameLobby() {
                   |
                 </span>
                 <span className="font-display font-bold text-base">
-                  Roulette
+                  {selectedCard?.title}
                 </span>
               </button>
             </div>
-            <RouletteGame />
+            {selectedGame === "roulette" ? (
+              <RouletteGame />
+            ) : (
+              <div
+                className="flex flex-col items-center justify-center min-h-[60vh] rounded-2xl"
+                style={{
+                  background: "oklch(0.10 0 0)",
+                  border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                }}
+              >
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.87 0.19 85 / 0.15), oklch(0.62 0.13 78 / 0.1))",
+                    border: "1px solid oklch(0.85 0.18 85 / 0.3)",
+                  }}
+                >
+                  <span className="text-4xl">
+                    {selectedGame === "aviator" ? "\u2708" : "\uD83C\uDCCF"}
+                  </span>
+                </div>
+                <h2 className="font-display text-3xl font-bold uppercase tracking-widest mb-3 gold-gradient-text">
+                  {selectedCard?.title}
+                </h2>
+                <p className="text-muted-foreground text-lg tracking-wide mb-8">
+                  Coming Soon
+                </p>
+                <p className="text-sm text-muted-foreground max-w-xs text-center">
+                  This game is currently under development. Stay tuned for an
+                  incredible experience.
+                </p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

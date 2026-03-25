@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Page } from "../App";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useBalance, useIsAdmin } from "../hooks/useQueries";
+import { useBalance } from "../hooks/useQueries";
 import TopUpModal from "./TopUpModal";
 
 interface NavbarProps {
@@ -15,7 +15,6 @@ interface NavbarProps {
 export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
   const { clear, identity } = useInternetIdentity();
   const { data: balance } = useBalance();
-  const { data: isAdmin } = useIsAdmin();
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -63,30 +62,28 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-4">
-            {isAdmin && (
-              <button
-                type="button"
-                data-ocid="nav.admin.link"
-                onClick={() => onNavigate("admin")}
-                className={`flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase px-3 py-1.5 rounded transition-all ${
-                  currentPage === "admin" ? "" : "hover:opacity-80"
-                }`}
-                style={{
-                  color:
-                    currentPage === "admin"
-                      ? "oklch(0.07 0 0)"
-                      : "oklch(0.85 0.18 85)",
-                  background:
-                    currentPage === "admin"
-                      ? "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))"
-                      : "transparent",
-                  border: "1px solid oklch(0.62 0.13 78 / 0.5)",
-                }}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Admin
-              </button>
-            )}
+            <button
+              type="button"
+              data-ocid="nav.admin.link"
+              onClick={() => onNavigate("admin")}
+              className={`flex items-center gap-1.5 text-xs font-semibold tracking-widest uppercase px-3 py-1.5 rounded transition-all ${
+                currentPage === "admin" ? "" : "hover:opacity-80"
+              }`}
+              style={{
+                color:
+                  currentPage === "admin"
+                    ? "oklch(0.07 0 0)"
+                    : "oklch(0.85 0.18 85)",
+                background:
+                  currentPage === "admin"
+                    ? "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))"
+                    : "transparent",
+                border: "1px solid oklch(0.62 0.13 78 / 0.5)",
+              }}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Admin
+            </button>
 
             {/* Balance */}
             <div
@@ -220,23 +217,21 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
             >
               + Top Up Coins
             </Button>
-            {isAdmin && (
-              <Button
-                data-ocid="nav.mobile.admin.button"
-                variant="outline"
-                onClick={() => {
-                  onNavigate("admin");
-                  setMenuOpen(false);
-                }}
-                className="w-full text-sm"
-                style={{
-                  borderColor: "oklch(0.62 0.13 78 / 0.5)",
-                  color: "oklch(0.85 0.18 85)",
-                }}
-              >
-                <Shield className="w-4 h-4 mr-2" /> Admin Dashboard
-              </Button>
-            )}
+            <Button
+              data-ocid="nav.mobile.admin.button"
+              variant="outline"
+              onClick={() => {
+                onNavigate("admin");
+                setMenuOpen(false);
+              }}
+              className="w-full text-sm"
+              style={{
+                borderColor: "oklch(0.62 0.13 78 / 0.5)",
+                color: "oklch(0.85 0.18 85)",
+              }}
+            >
+              <Shield className="w-4 h-4 mr-2" /> Admin Dashboard
+            </Button>
             <button
               type="button"
               data-ocid="nav.mobile.logout.button"
