@@ -28,6 +28,8 @@ export interface AdminStats {
     slotsStats: GameStats;
     houseProfit: bigint;
     hiloStats: GameStats;
+    aviatorStats: GameStats;
+    teenPattiStats: GameStats;
     totalWagered: bigint;
     totalPaidOut: bigint;
     totalUsers: bigint;
@@ -56,6 +58,21 @@ export interface MultiPlayResult {
     message: string;
     totalPayout: bigint;
 }
+export interface AviatorResult {
+    win: boolean;
+    payout: bigint;
+    crashPoint: bigint;
+    message: string;
+}
+export interface TeenPattiResult {
+    win: boolean;
+    payout: bigint;
+    playerCards: Array<bigint>;
+    dealerCards: Array<bigint>;
+    playerRank: bigint;
+    dealerRank: bigint;
+    message: string;
+}
 export interface UserProfile {
     balance: bigint;
     totalWagered: bigint;
@@ -74,16 +91,19 @@ export interface backendInterface {
     adminTopUpUser(user: Principal, amount: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     drawCard(): Promise<bigint>;
+    forceClaimAdmin(secret: string): Promise<string>;
     getBalance(): Promise<bigint>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getUserInfo(): Promise<UserProfile>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    playAviator(wager: bigint, targetMultiplierX100: bigint): Promise<AviatorResult>;
     playHiLo(wager: bigint, guess: string, currentCard: bigint): Promise<HiLoResult>;
     playRoulette(wager: bigint, betType: string, betValue: bigint): Promise<PlayResult>;
     playRouletteMulti(bets: Array<RouletteBet>): Promise<MultiPlayResult>;
     playSlots(wager: bigint): Promise<SlotsResult>;
+    playTeenPatti(wager: bigint): Promise<TeenPattiResult>;
     register(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     topUp(amount: bigint): Promise<void>;

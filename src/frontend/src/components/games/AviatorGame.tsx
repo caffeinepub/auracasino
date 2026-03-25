@@ -1,372 +1,389 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { usePlayHiLo, useUserInfo } from "../../hooks/useQueries";
+import { useEffect, useRef, useState } from "react";
+import { useActor } from "../../hooks/useActor";
+import { useBalance } from "../../hooks/useQueries";
 
-type GameState = "idle" | "flying" | "crashed" | "cashedout";
+type GameState = "idle" | "flying" | "result";
 
-const GRID_FRACTIONS = [0.25, 0.5, 0.75];
-
-function generateCrashPoint(): number {
-  const raw = (1 / (1 - Math.random())) * 0.97;
-  return Math.min(20, Math.max(1.1, raw));
+interface AviatorResult {
+  win: boolean;
+  payout: bigint;
+  crashPoint: bigint;
+  message: string;
 }
 
+const STAR_POSITIONS = [
+  { x: 40, y: 18 },
+  { x: 80, y: 33 },
+  { x: 130, y: 10 },
+  { x: 200, y: 56 },
+  { x: 270, y: 10 },
+  { x: 320, y: 33 },
+  { x: 370, y: 18 },
+  { x: 60, y: 56 },
+  { x: 180, y: 33 },
+  { x: 290, y: 56 },
+];
+
 export default function AviatorGame() {
-  const [wager, setWager] = useState("50");
-  const [state, setState] = useState<GameState>("idle");
-  const [multiplier, setMultiplier] = useState(1.0);
-  const [crashPoint, setCrashPoint] = useState(1.5);
-  const [cashoutMultiplier, setCashoutMultiplier] = useState<number | null>(
-    null,
-  );
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  const { data: balance } = useBalance();
 
-  const animRef = useRef<number | null>(null);
+  const [wager, setWager] = useState(100);
+  const [targetMultiplier, setTargetMultiplier] = useState(2.0);
+  const [gameState, setGameState] = useState<GameState>("idle");
+  const [displayMultiplier, setDisplayMultiplier] = useState(1.0);
+  const [result, setResult] = useState<AviatorResult | null>(null);
+  const animFrameRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
-  const crashPointRef = useRef<number>(1.5);
 
-  const { data: userInfo } = useUserInfo();
-  const playHiLo = usePlayHiLo();
-
-  const cleanup = useCallback(() => {
-    if (animRef.current) {
-      cancelAnimationFrame(animRef.current);
-      animRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => cleanup, [cleanup]);
-
-  function startFlight() {
-    const bet = Number.parseInt(wager, 10);
-    if (!bet || bet < 1) {
-      toast.error("Enter a valid wager!");
+  useEffect(() => {
+    if (gameState !== "flying") {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       return;
     }
-    const cp = generateCrashPoint();
-    setCrashPoint(cp);
-    crashPointRef.current = cp;
-    setMultiplier(1.0);
-    setCashoutMultiplier(null);
-    setState("flying");
     startTimeRef.current = performance.now();
-
-    function tick(now: number) {
+    const animate = (now: number) => {
       const elapsed = (now - startTimeRef.current) / 1000;
-      const current = Math.max(1.0, Math.E ** (elapsed * 0.4));
-      setMultiplier(current);
-      if (current >= crashPointRef.current) {
-        setMultiplier(crashPointRef.current);
-        setState("crashed");
-        playHiLo.mutate(
-          { wager: bet, guess: "lower", currentCard: BigInt(13) },
-          {
-            onSettled: () => {
-              toast.error(
-                `💥 Crashed at ${crashPointRef.current.toFixed(2)}x! Lost ${bet} coins.`,
-              );
-            },
-          },
-        );
-        return;
-      }
-      animRef.current = requestAnimationFrame(tick);
+      const newVal = 1.0 + elapsed * elapsed * 0.8;
+      setDisplayMultiplier(Math.min(newVal, targetMultiplier + 1));
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [gameState, targetMultiplier]);
+
+  async function handleFly() {
+    if (!actor || gameState !== "idle") return;
+    setResult(null);
+    setDisplayMultiplier(1.0);
+    setGameState("flying");
+    await new Promise((r) => setTimeout(r, 2200));
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    try {
+      const res = await (actor as any).playAviator(
+        BigInt(wager),
+        BigInt(Math.round(targetMultiplier * 100)),
+      );
+      setResult(res as AviatorResult);
+      setDisplayMultiplier(Number(res.crashPoint) / 100);
+      queryClient.invalidateQueries({ queryKey: ["balance"] });
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    } catch (_e) {
+      setResult(null);
     }
-    animRef.current = requestAnimationFrame(tick);
+    setGameState("result");
   }
 
-  function cashOut() {
-    if (state !== "flying") return;
-    cleanup();
-    const bet = Number.parseInt(wager, 10);
-    const payout = Math.floor(bet * multiplier);
-    setCashoutMultiplier(multiplier);
-    setState("cashedout");
-    playHiLo.mutate(
-      { wager: bet, guess: "higher", currentCard: BigInt(1) },
-      {
-        onSettled: () => {
-          toast.success(
-            `🚀 Cashed out at ${multiplier.toFixed(2)}x! Won ${payout} coins!`,
-          );
-        },
-      },
-    );
+  function handlePlayAgain() {
+    setGameState("idle");
+    setResult(null);
+    setDisplayMultiplier(1.0);
   }
 
-  const bet = Number.parseInt(wager, 10) || 0;
-  const potentialWin = Math.floor(bet * multiplier);
-  const isFlying = state === "flying";
-  const planeY = isFlying ? Math.min(60, (multiplier - 1) * 12) : 0;
-  const planeX = isFlying ? Math.min(40, (multiplier - 1) * 8) : 0;
+  const planeX = gameState === "flying" ? 78 : gameState === "result" ? 82 : 15;
+  const planeY = gameState === "flying" ? 18 : gameState === "result" ? 22 : 75;
 
   return (
     <div
-      className="rounded-2xl overflow-hidden flex flex-col"
+      className="rounded-2xl overflow-hidden max-w-2xl mx-auto"
       style={{
-        background: "oklch(0.10 0 0)",
-        border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-        minHeight: "480px",
+        background: "oklch(0.08 0.02 240)",
+        border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+        boxShadow: "0 0 60px oklch(0 0 0 / 0.5)",
       }}
     >
       <div
-        className="px-5 py-4"
-        style={{ borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
+        className="relative w-full"
+        style={{ height: "260px", background: "oklch(0.06 0.03 240)" }}
       >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl font-bold uppercase tracking-widest gold-gradient-text">
-            Aviator
-          </h3>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
-            Multiplier Crash
-          </span>
-        </div>
+        <svg
+          viewBox="0 0 400 260"
+          className="w-full h-full"
+          aria-label="Aviator game canvas"
+        >
+          <title>Aviator</title>
+          <defs>
+            <radialGradient id="sky" cx="50%" cy="100%" r="80%">
+              <stop offset="0%" stopColor="oklch(0.12 0.05 240)" />
+              <stop offset="100%" stopColor="oklch(0.05 0.02 240)" />
+            </radialGradient>
+            <linearGradient id="curve-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="oklch(0.85 0.18 85 / 0.2)" />
+              <stop offset="100%" stopColor="oklch(0.85 0.18 85)" />
+            </linearGradient>
+            <linearGradient id="plane-gold" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="oklch(0.62 0.13 78)" />
+              <stop offset="100%" stopColor="oklch(0.90 0.19 85)" />
+            </linearGradient>
+            <filter id="glow-filter">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          <rect width="400" height="260" fill="url(#sky)" />
+          {STAR_POSITIONS.map((s) => (
+            <circle
+              key={`star-${s.x}-${s.y}`}
+              cx={s.x}
+              cy={s.y}
+              r="1"
+              fill="white"
+              opacity="0.5"
+            />
+          ))}
+          <line
+            x1="20"
+            y1="240"
+            x2="380"
+            y2="240"
+            stroke="oklch(0.85 0.18 85 / 0.12)"
+            strokeWidth="1"
+          />
+          <line
+            x1="20"
+            y1="240"
+            x2="20"
+            y2="10"
+            stroke="oklch(0.85 0.18 85 / 0.12)"
+            strokeWidth="1"
+          />
+          <line
+            x1="20"
+            y1="185"
+            x2="380"
+            y2="185"
+            stroke="oklch(0.85 0.18 85 / 0.06)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+          <line
+            x1="20"
+            y1="130"
+            x2="380"
+            y2="130"
+            stroke="oklch(0.85 0.18 85 / 0.06)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+          <line
+            x1="20"
+            y1="75"
+            x2="380"
+            y2="75"
+            stroke="oklch(0.85 0.18 85 / 0.06)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+          <path
+            d="M20,230 Q100,220 180,180 Q260,130 360,30 L380,240 L20,240 Z"
+            fill="oklch(0.85 0.18 85 / 0.05)"
+          />
+          <path
+            d="M20,230 Q100,220 180,180 Q260,130 360,30"
+            fill="none"
+            stroke="url(#curve-grad)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M20,230 Q100,220 180,180 Q260,130 360,30"
+            fill="none"
+            stroke="oklch(0.85 0.18 85 / 0.25)"
+            strokeWidth="6"
+            filter="url(#glow-filter)"
+          />
+          <motion.g
+            animate={{ x: planeX * 4, y: planeY * 2.6 }}
+            transition={{
+              duration: gameState === "flying" ? 2.2 : 0.3,
+              ease: "easeInOut",
+            }}
+          >
+            <g transform="rotate(-30, 0, 0)">
+              <ellipse cx="0" cy="0" rx="18" ry="6" fill="url(#plane-gold)" />
+              <ellipse
+                cx="12"
+                cy="-2"
+                rx="7"
+                ry="4"
+                fill="oklch(0.92 0.15 85)"
+              />
+              <polygon
+                points="-4,-7 -14,-20 -20,-7"
+                fill="oklch(0.78 0.16 82)"
+              />
+              <polygon points="-4,7 -14,20 -20,7" fill="oklch(0.78 0.16 82)" />
+              <polygon
+                points="-16,-3 -24,-12 -18,-3"
+                fill="oklch(0.62 0.13 78)"
+              />
+            </g>
+          </motion.g>
+          <text
+            x="30"
+            y="50"
+            fontFamily="monospace"
+            fontSize="36"
+            fontWeight="bold"
+            fill={
+              result?.win
+                ? "oklch(0.83 0.19 155)"
+                : result
+                  ? "oklch(0.72 0.25 25)"
+                  : "oklch(0.87 0.19 85)"
+            }
+            opacity="0.95"
+          >
+            {displayMultiplier.toFixed(2)}x
+          </text>
+        </svg>
       </div>
 
-      <div className="flex-1 flex flex-col px-5 py-5 gap-5">
-        {/* Flight display */}
-        <div
-          className="relative rounded-xl overflow-hidden"
-          style={{
-            height: "220px",
-            background: "oklch(0.07 0.02 250)",
-            border: "1px solid oklch(0.62 0.13 78 / 0.2)",
-          }}
-        >
-          <svg
-            className="absolute inset-0 w-full h-full"
-            preserveAspectRatio="none"
-          >
-            <title>Aviator flight display</title>
-            {GRID_FRACTIONS.map((f) => (
-              <line
-                key={`h-${f}`}
-                x1="0"
-                y1={`${f * 100}%`}
-                x2="100%"
-                y2={`${f * 100}%`}
-                stroke="oklch(0.62 0.13 78 / 0.1)"
-                strokeWidth="1"
-                strokeDasharray="6,6"
-              />
-            ))}
-            {GRID_FRACTIONS.map((f) => (
-              <line
-                key={`v-${f}`}
-                x1={`${f * 100}%`}
-                y1="0"
-                x2={`${f * 100}%`}
-                y2="100%"
-                stroke="oklch(0.62 0.13 78 / 0.1)"
-                strokeWidth="1"
-                strokeDasharray="6,6"
-              />
-            ))}
-          </svg>
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            <AnimatePresence mode="wait">
-              {state === "crashed" ? (
-                <motion.div
-                  key="crashed"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-center"
-                >
-                  <p
-                    className="text-6xl font-black"
-                    style={{ color: "oklch(0.62 0.25 25)" }}
-                  >
-                    {crashPoint.toFixed(2)}x
-                  </p>
-                  <p
-                    className="text-sm uppercase tracking-widest mt-2"
-                    style={{ color: "oklch(0.62 0.25 25)" }}
-                  >
-                    CRASHED
-                  </p>
-                </motion.div>
-              ) : state === "cashedout" ? (
-                <motion.div
-                  key="cashedout"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-center"
-                >
-                  <p className="text-6xl font-black gold-gradient-text">
-                    {cashoutMultiplier?.toFixed(2)}x
-                  </p>
-                  <p className="text-sm uppercase tracking-widest mt-2 win-glow">
-                    CASHED OUT!
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div key="flying" className="text-center">
-                  <motion.p
-                    className="font-black gold-gradient-text tabular-nums"
-                    style={{
-                      fontSize: isFlying ? "clamp(3rem, 8vw, 5rem)" : "3rem",
-                    }}
-                    animate={{ scale: isFlying ? [1, 1.02, 1] : 1 }}
-                    transition={{
-                      repeat: Number.POSITIVE_INFINITY,
-                      duration: 0.5,
-                    }}
-                  >
-                    {multiplier.toFixed(2)}x
-                  </motion.p>
-                  {!isFlying && (
-                    <p className="text-xs text-muted-foreground uppercase tracking-widest mt-2">
-                      Waiting for takeoff…
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <AnimatePresence>
-            {isFlying && (
-              <motion.div
-                initial={{ x: 40, y: 180, opacity: 0 }}
-                animate={{
-                  x: 40 + planeX * 2,
-                  y: 180 - planeY * 2.2,
-                  opacity: 1,
-                }}
-                className="absolute text-3xl pointer-events-none"
+      <div className="p-6">
+        <AnimatePresence mode="wait">
+          {gameState === "result" && result && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mb-5 p-4 rounded-xl text-center"
+              style={{
+                background: result.win
+                  ? "oklch(0.83 0.19 155 / 0.1)"
+                  : "oklch(0.62 0.25 25 / 0.1)",
+                border: `1px solid ${result.win ? "oklch(0.83 0.19 155 / 0.4)" : "oklch(0.62 0.25 25 / 0.4)"}`,
+              }}
+            >
+              <p
+                className="font-bold text-lg"
                 style={{
-                  filter: "drop-shadow(0 0 8px oklch(0.85 0.18 85 / 0.8))",
+                  color: result.win
+                    ? "oklch(0.83 0.19 155)"
+                    : "oklch(0.72 0.25 25)",
                 }}
+                data-ocid={
+                  result.win ? "aviator.success_state" : "aviator.error_state"
+                }
               >
-                ✈
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {isFlying && (
-            <svg
-              className="absolute inset-0 w-full h-full"
-              style={{ pointerEvents: "none" }}
-            >
-              <title>Multiplier trail</title>
-              <path
-                d={`M40,${220 - 20} Q${40 + planeX * 2},${180 - planeY} ${40 + planeX * 2 + 10},${220 - planeY * 2.2}`}
-                stroke="oklch(0.85 0.18 85 / 0.5)"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-              />
-            </svg>
+                {result.win
+                  ? `✈️ You cashed out at ${targetMultiplier}x! Won ${Number(result.payout).toLocaleString()} coins!`
+                  : `💥 Crashed at ${(Number(result.crashPoint) / 100).toFixed(2)}x before your ${targetMultiplier}x cashout!`}
+              </p>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
-        {userInfo && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground uppercase tracking-wider text-xs">
-              Balance
-            </span>
-            <span
-              className="font-bold tabular-nums"
-              style={{ color: "oklch(0.85 0.18 85)" }}
-            >
-              {Number(userInfo.balance).toLocaleString()} coins
-            </span>
-          </div>
-        )}
-
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-col sm:flex-row gap-4 mb-5">
           <div className="flex-1">
             <label
               htmlFor="aviator-wager"
-              className="text-xs text-muted-foreground uppercase tracking-wider mb-1 block"
+              className="block text-xs uppercase tracking-wider mb-2"
+              style={{ color: "oklch(0.85 0.18 85)" }}
             >
-              Wager (coins)
+              Wager
             </label>
-            <Input
+            <input
               id="aviator-wager"
-              data-ocid="aviator.input"
+              data-ocid="aviator.wager.input"
               type="number"
-              min={1}
+              min={10}
               value={wager}
-              onChange={(e) => setWager(e.target.value)}
-              disabled={isFlying}
+              onChange={(e) => setWager(Math.max(10, Number(e.target.value)))}
+              disabled={gameState === "flying"}
+              className="w-full px-4 py-2 rounded-lg text-white bg-transparent outline-none"
               style={{
-                background: "oklch(0.14 0 0)",
-                border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-                color: "oklch(0.97 0 0)",
+                border: "1px solid oklch(0.62 0.13 78 / 0.4)",
+                background: "oklch(0.08 0 0)",
               }}
             />
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-              Potential
-            </p>
-            <p className="font-bold" style={{ color: "oklch(0.85 0.18 85)" }}>
-              {potentialWin.toLocaleString()}
-            </p>
+          <div className="flex-1">
+            <label
+              htmlFor="aviator-target"
+              className="block text-xs uppercase tracking-wider mb-2"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Target Cashout:{" "}
+              <span style={{ color: "oklch(0.90 0.19 85)" }}>
+                {targetMultiplier.toFixed(1)}x
+              </span>
+            </label>
+            <input
+              id="aviator-target"
+              data-ocid="aviator.target.input"
+              type="range"
+              min={1.1}
+              max={10.0}
+              step={0.1}
+              value={targetMultiplier}
+              onChange={(e) => setTargetMultiplier(Number(e.target.value))}
+              disabled={gameState === "flying"}
+              className="w-full accent-yellow-400"
+            />
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {[10, 25, 50, 100, 250].map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setWager(String(v))}
-              disabled={isFlying}
-              className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
-              style={{
-                background:
-                  wager === String(v)
-                    ? "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))"
-                    : "oklch(0.17 0 0)",
-                color:
-                  wager === String(v) ? "oklch(0.07 0 0)" : "oklch(0.65 0 0)",
-                border: `1px solid ${wager === String(v) ? "oklch(0.85 0.18 85 / 0.6)" : "oklch(0.62 0.13 78 / 0.2)"}`,
-              }}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs text-muted-foreground">
+            Balance:{" "}
+            <span style={{ color: "oklch(0.85 0.18 85)" }}>
+              {balance !== undefined ? Number(balance).toLocaleString() : "—"}{" "}
+              coins
+            </span>
+          </span>
         </div>
 
-        <div className="flex gap-3 mt-auto">
-          {(state === "idle" ||
-            state === "crashed" ||
-            state === "cashedout") && (
-            <Button
-              data-ocid="aviator.primary_button"
-              onClick={startFlight}
-              className="flex-1 font-bold uppercase tracking-wider text-base py-6"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                color: "oklch(0.07 0 0)",
-                border: "none",
-              }}
-            >
-              {state === "idle" ? "🛫 TAKE OFF" : "🔄 PLAY AGAIN"}
-            </Button>
-          )}
-          {isFlying && (
-            <Button
-              data-ocid="aviator.secondary_button"
-              onClick={cashOut}
-              className="flex-1 font-bold uppercase tracking-wider text-base py-6 animate-pulse-gold"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.83 0.19 155), oklch(0.65 0.15 155))",
-                color: "white",
-                border: "none",
-              }}
-            >
-              💰 CASH OUT ({multiplier.toFixed(2)}x)
-            </Button>
-          )}
-        </div>
+        {gameState === "result" ? (
+          <button
+            type="button"
+            data-ocid="aviator.play_again.button"
+            onClick={handlePlayAgain}
+            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-opacity hover:opacity-90"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+              color: "oklch(0.07 0 0)",
+            }}
+          >
+            Fly Again
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-ocid="aviator.fly.primary_button"
+            onClick={handleFly}
+            disabled={gameState === "flying" || !actor || wager < 10}
+            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+              color: "oklch(0.07 0 0)",
+            }}
+          >
+            {gameState === "flying" ? (
+              <span className="flex items-center justify-center gap-2">
+                <motion.span
+                  animate={{ opacity: [1, 0.4, 1] }}
+                  transition={{
+                    repeat: Number.POSITIVE_INFINITY,
+                    duration: 0.8,
+                  }}
+                >
+                  ✈️
+                </motion.span>
+                Flying…
+              </span>
+            ) : (
+              `✈️ Fly & Cash Out at ${targetMultiplier.toFixed(1)}x`
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

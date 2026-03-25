@@ -21,7 +21,7 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useActor } from "../hooks/useActor";
-import { useAdminStats, useAdminUsers, useIsAdmin } from "../hooks/useQueries";
+import { useAdminStats, useAdminUsers } from "../hooks/useQueries";
 
 function StatCard({
   icon: Icon,
@@ -225,30 +225,8 @@ function CreateUserSection() {
 }
 
 export default function AdminPage() {
-  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: users, isLoading: usersLoading } = useAdminUsers();
-
-  if (isAdminLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2
-          className="w-8 h-8 animate-spin"
-          style={{ color: "oklch(0.85 0.18 85)" }}
-        />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <p className="text-muted-foreground text-lg">
-          Access Denied — Admin only
-        </p>
-      </div>
-    );
-  }
 
   const houseProfit = stats ? Number(stats.houseProfit) : 0;
 

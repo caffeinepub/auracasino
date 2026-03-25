@@ -1,11 +1,11 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { toast } from "sonner";
-import { usePlayHiLo, useUserInfo } from "../../hooks/useQueries";
+import { useActor } from "../../hooks/useActor";
+import { useBalance } from "../../hooks/useQueries";
 
 const RANKS = [
+  "A",
   "2",
   "3",
   "4",
@@ -18,437 +18,419 @@ const RANKS = [
   "J",
   "Q",
   "K",
-  "A",
 ];
 const SUITS = ["♠", "♥", "♦", "♣"];
-const SUIT_COLORS: Record<string, string> = {
-  "♠": "#111",
-  "♥": "#dc2626",
-  "♦": "#dc2626",
-  "♣": "#111",
-};
-
-interface Card {
-  rank: string;
-  suit: string;
-  rankIdx: number;
-}
-
-function drawCards(n: number): Card[] {
-  const used = new Set<number>();
-  const cards: Card[] = [];
-  while (cards.length < n) {
-    const idx = Math.floor(Math.random() * 52);
-    if (used.has(idx)) continue;
-    used.add(idx);
-    cards.push({
-      rank: RANKS[idx % 13],
-      suit: SUITS[Math.floor(idx / 13)],
-      rankIdx: idx % 13,
-    });
-  }
-  return cards;
-}
-
-function handRank(cards: Card[]): number {
-  const ranks = cards.map((c) => c.rankIdx).sort((a, b) => a - b);
-  const suits = cards.map((c) => c.suit);
-  const isFlush = suits.every((s) => s === suits[0]);
-  const isSeq = ranks[2] - ranks[1] === 1 && ranks[1] - ranks[0] === 1;
-  const isAceSeq =
-    JSON.stringify(ranks) === JSON.stringify([0, 1, 12]) ||
-    JSON.stringify(ranks) === JSON.stringify([0, 11, 12]);
-  const counts = Object.values(
-    ranks.reduce((acc: Record<number, number>, r) => {
-      acc[r] = (acc[r] || 0) + 1;
-      return acc;
-    }, {}),
-  ).sort((a, b) => b - a);
-  if (counts[0] === 3) return 6;
-  if (isFlush && (isSeq || isAceSeq)) return 5;
-  if (isSeq || isAceSeq) return 4;
-  if (isFlush) return 3;
-  if (counts[0] === 2) return 2;
-  return 1;
-}
-
+const SUIT_COLORS = ["#1a1a1a", "#c41e3a", "#c41e3a", "#1a1a1a"];
 const HAND_NAMES = [
-  "",
   "High Card",
   "Pair",
-  "Flush",
-  "Straight",
-  "Straight Flush",
+  "Color",
+  "Sequence",
+  "Pure Sequence",
   "Trail",
 ];
 
+function parseCard(cardNum: number) {
+  const rank = RANKS[cardNum % 13];
+  const suitIdx = Math.floor(cardNum / 13);
+  const suit = SUITS[suitIdx];
+  const color = SUIT_COLORS[suitIdx];
+  return { rank, suit, color };
+}
+
 function PlayingCard({
-  card,
-  faceDown,
+  cardNum,
+  faceDown = false,
   delay = 0,
-}: { card: Card; faceDown?: boolean; delay?: number }) {
+  revealed = false,
+  slotKey,
+}: {
+  cardNum?: number;
+  faceDown?: boolean;
+  delay?: number;
+  revealed?: boolean;
+  slotKey: string;
+}) {
+  const card = cardNum !== undefined ? parseCard(cardNum) : null;
+
   return (
     <motion.div
-      initial={{ rotateY: 90, opacity: 0 }}
-      animate={{ rotateY: 0, opacity: 1 }}
+      key={slotKey}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
       transition={{ delay, duration: 0.4, ease: "easeOut" }}
-      className="relative rounded-lg flex flex-col justify-between p-2 select-none"
+      className="relative rounded-lg overflow-hidden flex-shrink-0"
       style={{
-        width: "54px",
-        height: "78px",
-        background: faceDown
-          ? "linear-gradient(135deg, oklch(0.18 0.04 250), oklch(0.12 0 0))"
-          : "oklch(0.97 0 0)",
-        border: faceDown
-          ? "1px solid oklch(0.62 0.13 78 / 0.4)"
-          : "1px solid oklch(0.85 0 0)",
-        boxShadow: "0 4px 12px oklch(0 0 0 / 0.5)",
-        transformStyle: "preserve-3d",
+        width: "60px",
+        height: "90px",
+        background:
+          faceDown && !revealed
+            ? "oklch(0.15 0.04 240)"
+            : "oklch(0.97 0.01 85)",
+        border:
+          faceDown && !revealed
+            ? "1px solid oklch(0.62 0.13 78 / 0.5)"
+            : "1.5px solid oklch(0.62 0.13 78 / 0.8)",
+        boxShadow: "0 4px 12px oklch(0 0 0 / 0.4)",
       }}
     >
-      {faceDown ? (
+      {faceDown && !revealed ? (
         <div
-          className="absolute inset-1 rounded"
+          className="w-full h-full flex items-center justify-center"
           style={{
             background:
-              "repeating-linear-gradient(45deg, oklch(0.62 0.13 78 / 0.2) 0px, oklch(0.62 0.13 78 / 0.2) 2px, transparent 2px, transparent 8px)",
-            border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+              "repeating-linear-gradient(45deg, oklch(0.18 0.04 240) 0px, oklch(0.18 0.04 240) 4px, oklch(0.12 0.03 240) 4px, oklch(0.12 0.03 240) 8px)",
           }}
-        />
-      ) : (
-        <>
+        >
+          <span style={{ fontSize: "24px" }}>🂠</span>
+        </div>
+      ) : card ? (
+        <div className="p-1 w-full h-full flex flex-col justify-between">
           <div
-            className="text-xs font-black leading-none"
-            style={{ color: SUIT_COLORS[card.suit] }}
+            className="text-left"
+            style={{
+              color: card.color,
+              fontSize: "13px",
+              fontWeight: "bold",
+              lineHeight: 1,
+            }}
           >
-            {card.rank}
+            <div>{card.rank}</div>
+            <div style={{ fontSize: "11px" }}>{card.suit}</div>
           </div>
           <div
-            className="text-center text-2xl leading-none"
-            style={{ color: SUIT_COLORS[card.suit] }}
+            className="text-center"
+            style={{ color: card.color, fontSize: "22px", lineHeight: 1 }}
           >
             {card.suit}
           </div>
           <div
-            className="text-xs font-black leading-none self-end rotate-180"
-            style={{ color: SUIT_COLORS[card.suit] }}
+            className="text-right"
+            style={{
+              color: card.color,
+              fontSize: "13px",
+              fontWeight: "bold",
+              lineHeight: 1,
+              transform: "rotate(180deg)",
+            }}
           >
-            {card.rank}
+            <div>{card.rank}</div>
+            <div style={{ fontSize: "11px" }}>{card.suit}</div>
           </div>
-        </>
-      )}
+        </div>
+      ) : null}
     </motion.div>
   );
 }
 
-type GameState = "idle" | "dealt" | "revealed";
+function CardHand({
+  cards,
+  label,
+  handRank,
+  faceDown = false,
+  revealed = false,
+  win,
+  handKey,
+}: {
+  cards: number[];
+  label: string;
+  handRank?: number;
+  faceDown?: boolean;
+  revealed?: boolean;
+  win?: boolean;
+  handKey: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <span
+        className="text-xs uppercase tracking-widest font-semibold"
+        style={{ color: "oklch(0.85 0.18 85)" }}
+      >
+        {label}
+      </span>
+      <div
+        className="flex gap-2 p-3 rounded-xl"
+        style={{
+          background: "oklch(0.09 0 0)",
+          border:
+            win === true
+              ? "2px solid oklch(0.85 0.18 85 / 0.8)"
+              : win === false
+                ? "1px solid oklch(0.62 0.25 25 / 0.4)"
+                : "1px solid oklch(0.62 0.13 78 / 0.2)",
+          boxShadow:
+            win === true ? "0 0 20px oklch(0.85 0.18 85 / 0.2)" : "none",
+        }}
+      >
+        {cards.map((c, i) => (
+          <PlayingCard
+            key={`${handKey}-card-${c}`}
+            slotKey={`${handKey}-card-${c}`}
+            cardNum={c}
+            faceDown={faceDown}
+            revealed={revealed}
+            delay={i * 0.1}
+          />
+        ))}
+      </div>
+      {handRank !== undefined && !faceDown && (
+        <span
+          className="text-xs font-bold uppercase tracking-wider"
+          style={{ color: win ? "oklch(0.85 0.18 85)" : "oklch(0.65 0 0)" }}
+        >
+          {HAND_NAMES[handRank] ?? "Unknown"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface TeenPattiResult {
+  win: boolean;
+  payout: bigint;
+  playerCards: bigint[];
+  dealerCards: bigint[];
+  playerRank: bigint;
+  dealerRank: bigint;
+  message: string;
+}
+
+type GameState = "idle" | "dealing" | "result";
 
 export default function TeenPattiGame() {
-  const [wager, setWager] = useState("50");
-  const [state, setState] = useState<GameState>("idle");
-  const [playerCards, setPlayerCards] = useState<Card[]>([]);
-  const [dealerCards, setDealerCards] = useState<Card[]>([]);
-  const [playerWins, setPlayerWins] = useState<boolean | null>(null);
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  const { data: balance } = useBalance();
 
-  const { data: userInfo } = useUserInfo();
-  const playHiLo = usePlayHiLo();
+  const [wager, setWager] = useState(100);
+  const [gameState, setGameState] = useState<GameState>("idle");
+  const [result, setResult] = useState<TeenPattiResult | null>(null);
 
-  function deal() {
-    const bet = Number.parseInt(wager, 10);
-    if (!bet || bet < 1) {
-      toast.error("Enter a valid wager!");
-      return;
+  const placeholderCards = [0, 1, 2];
+
+  async function handleDeal() {
+    if (!actor || gameState !== "idle") return;
+    setResult(null);
+    setGameState("dealing");
+    try {
+      const res = await (actor as any).playTeenPatti(BigInt(wager));
+      setResult(res as TeenPattiResult);
+      queryClient.invalidateQueries({ queryKey: ["balance"] });
+      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    } catch (_e) {
+      setResult(null);
     }
-    const all = drawCards(6);
-    setPlayerCards(all.slice(0, 3));
-    setDealerCards(all.slice(3, 6));
-    setPlayerWins(null);
-    setState("dealt");
+    setGameState("result");
   }
 
-  function reveal() {
-    const bet = Number.parseInt(wager, 10);
-    const pRank = handRank(playerCards);
-    const dRank = handRank(dealerCards);
-    const pWins = pRank >= dRank;
-    setPlayerWins(pWins);
-    setState("revealed");
-    playHiLo.mutate(
-      { wager: bet, guess: pWins ? "higher" : "lower", currentCard: BigInt(7) },
-      {
-        onSettled: () => {
-          if (pWins)
-            toast.success(
-              `🃏 You win! ${HAND_NAMES[pRank]} beats ${HAND_NAMES[dRank]}! +${bet * 2} coins`,
-            );
-          else
-            toast.error(
-              `💸 Dealer wins with ${HAND_NAMES[dRank]}. Lost ${bet} coins.`,
-            );
-        },
-      },
-    );
+  function handleAgain() {
+    setGameState("idle");
+    setResult(null);
   }
 
-  function reset() {
-    setState("idle");
-    setPlayerCards([]);
-    setDealerCards([]);
-    setPlayerWins(null);
-  }
-
-  const EMPTY_SLOTS = [0, 1, 2];
+  const isDealing = gameState === "dealing";
+  const isResult = gameState === "result" && result !== null;
 
   return (
     <div
-      className="rounded-2xl overflow-hidden flex flex-col"
+      className="rounded-2xl overflow-hidden max-w-2xl mx-auto"
       style={{
-        background: "oklch(0.10 0 0)",
-        border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-        minHeight: "480px",
+        background: "oklch(0.08 0.02 150)",
+        border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+        boxShadow: "0 0 60px oklch(0 0 0 / 0.5)",
       }}
     >
       <div
-        className="px-5 py-4"
-        style={{ borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
+        className="relative px-6 py-8"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, oklch(0.18 0.06 150) 0%, oklch(0.10 0.03 150) 100%)",
+          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+          minHeight: "260px",
+        }}
       >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl font-bold uppercase tracking-widest gold-gradient-text">
-            Teen Patti
-          </h3>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
-            3-Card Showdown
-          </span>
+        <div className="mb-6">
+          {isResult ? (
+            <CardHand
+              cards={result.dealerCards.map(Number)}
+              label="Dealer"
+              handRank={Number(result.dealerRank)}
+              revealed={true}
+              win={!result.win}
+              handKey="dealer-result"
+            />
+          ) : (
+            <CardHand
+              cards={placeholderCards}
+              label="Dealer"
+              faceDown={true}
+              handKey="dealer-idle"
+            />
+          )}
         </div>
+
+        <div className="flex items-center gap-3 my-4">
+          <div
+            className="flex-1 h-px"
+            style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
+          />
+          <span
+            className="text-xs uppercase tracking-widest font-bold px-3"
+            style={{ color: "oklch(0.62 0.13 78)" }}
+          >
+            VS
+          </span>
+          <div
+            className="flex-1 h-px"
+            style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
+          />
+        </div>
+
+        <div className="mt-6">
+          {isResult ? (
+            <CardHand
+              cards={result.playerCards.map(Number)}
+              label="Your Hand"
+              handRank={Number(result.playerRank)}
+              revealed={true}
+              win={result.win}
+              handKey="player-result"
+            />
+          ) : (
+            <CardHand
+              cards={placeholderCards}
+              label="Your Hand"
+              faceDown={!isDealing}
+              handKey="player-idle"
+            />
+          )}
+        </div>
+
+        <AnimatePresence>
+          {isDealing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ background: "oklch(0.05 0 0 / 0.6)" }}
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{
+                  repeat: Number.POSITIVE_INFINITY,
+                  duration: 1,
+                  ease: "linear",
+                }}
+                className="w-10 h-10 rounded-full border-2 border-t-transparent"
+                style={{ borderColor: "oklch(0.85 0.18 85)" }}
+                data-ocid="teen_patti.loading_state"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      <div className="flex-1 flex flex-col px-5 py-5 gap-5">
-        <div
-          className="rounded-xl relative flex flex-col items-center justify-around gap-4 py-5 px-4"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, oklch(0.16 0.06 155) 0%, oklch(0.09 0.02 155) 100%)",
-            border: "2px solid oklch(0.62 0.13 78 / 0.3)",
-            minHeight: "240px",
-          }}
-        >
-          {/* Dealer row */}
-          <div className="w-full">
+      <AnimatePresence>
+        {isResult && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-6 py-4 text-center"
+            style={{
+              background: result.win
+                ? "oklch(0.83 0.19 155 / 0.08)"
+                : "oklch(0.62 0.25 25 / 0.08)",
+              borderBottom: `1px solid ${result.win ? "oklch(0.83 0.19 155 / 0.3)" : "oklch(0.62 0.25 25 / 0.3)"}`,
+            }}
+          >
             <p
-              className="text-xs uppercase tracking-widest text-center mb-3"
-              style={{ color: "oklch(0.62 0.13 78)" }}
+              className="font-bold text-base"
+              style={{
+                color: result.win
+                  ? "oklch(0.83 0.19 155)"
+                  : "oklch(0.72 0.25 25)",
+              }}
+              data-ocid={
+                result.win
+                  ? "teen_patti.success_state"
+                  : "teen_patti.error_state"
+              }
             >
-              Dealer
+              {result.win
+                ? `🏆 You Win! ${result.message}`
+                : `😔 ${result.message}`}
             </p>
-            <div className="flex justify-center gap-2">
-              <AnimatePresence mode="wait">
-                {state === "idle"
-                  ? EMPTY_SLOTS.map((i) => (
-                      <div
-                        key={`dealer-empty-${i}`}
-                        className="rounded-lg"
-                        style={{
-                          width: 54,
-                          height: 78,
-                          background: "oklch(0.14 0 0)",
-                          border: "1px dashed oklch(0.62 0.13 78 / 0.2)",
-                        }}
-                      />
-                    ))
-                  : dealerCards.map((c, i) => (
-                      <PlayingCard
-                        key={`dealer-${c.rank}-${c.suit}`}
-                        card={c}
-                        faceDown={state === "dealt"}
-                        delay={0.1 + i * 0.1}
-                      />
-                    ))}
-              </AnimatePresence>
-            </div>
-            {state === "revealed" && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center mt-2 text-xs uppercase tracking-wider"
-                style={{ color: "oklch(0.62 0.13 78)" }}
-              >
-                {HAND_NAMES[handRank(dealerCards)]}
-              </motion.p>
-            )}
-          </div>
-
-          <div className="w-full flex items-center gap-2">
-            <div
-              className="flex-1 h-px"
-              style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
-            />
-            <span className="text-xs" style={{ color: "oklch(0.62 0.13 78)" }}>
-              VS
-            </span>
-            <div
-              className="flex-1 h-px"
-              style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
-            />
-          </div>
-
-          {/* Player row */}
-          <div className="w-full">
-            <div className="flex justify-center gap-2">
-              <AnimatePresence mode="wait">
-                {state === "idle"
-                  ? EMPTY_SLOTS.map((i) => (
-                      <div
-                        key={`player-empty-${i}`}
-                        className="rounded-lg"
-                        style={{
-                          width: 54,
-                          height: 78,
-                          background: "oklch(0.14 0 0)",
-                          border: "1px dashed oklch(0.62 0.13 78 / 0.2)",
-                        }}
-                      />
-                    ))
-                  : playerCards.map((c, i) => (
-                      <PlayingCard
-                        key={`player-${c.rank}-${c.suit}`}
-                        card={c}
-                        faceDown={false}
-                        delay={0.3 + i * 0.1}
-                      />
-                    ))}
-              </AnimatePresence>
-            </div>
-            {state === "revealed" && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center mt-2 text-xs uppercase tracking-wider"
-                style={{ color: "oklch(0.85 0.18 85)" }}
-              >
-                {HAND_NAMES[handRank(playerCards)]}
-              </motion.p>
-            )}
-            <p
-              className="text-center mt-3 text-xs uppercase tracking-widest"
-              style={{ color: "oklch(0.62 0.13 78)" }}
-            >
-              You
-            </p>
-          </div>
-
-          <AnimatePresence>
-            {state === "revealed" && playerWins !== null && (
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              >
-                <div
-                  className="px-8 py-3 rounded-xl font-display text-2xl font-bold uppercase tracking-widest"
-                  style={{
-                    background: playerWins
-                      ? "linear-gradient(135deg, oklch(0.83 0.19 155 / 0.9), oklch(0.65 0.15 155 / 0.9))"
-                      : "linear-gradient(135deg, oklch(0.62 0.25 25 / 0.9), oklch(0.45 0.2 25 / 0.9))",
-                    color: "white",
-                    boxShadow: playerWins
-                      ? "0 0 30px oklch(0.83 0.19 155 / 0.5)"
-                      : "0 0 30px oklch(0.62 0.25 25 / 0.5)",
-                    backdropFilter: "blur(4px)",
-                  }}
-                >
-                  {playerWins ? "🏆 YOU WIN!" : "💸 DEALER WINS"}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {userInfo && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground uppercase tracking-wider text-xs">
-              Balance
-            </span>
-            <span
-              className="font-bold tabular-nums"
-              style={{ color: "oklch(0.85 0.18 85)" }}
-            >
-              {Number(userInfo.balance).toLocaleString()} coins
-            </span>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        <div className="flex gap-3 items-end">
+      <div className="p-6">
+        <div className="flex items-center gap-4 mb-4">
           <div className="flex-1">
             <label
-              htmlFor="teenpatti-wager"
-              className="text-xs text-muted-foreground uppercase tracking-wider mb-1 block"
+              htmlFor="teen-patti-wager"
+              className="block text-xs uppercase tracking-wider mb-2"
+              style={{ color: "oklch(0.85 0.18 85)" }}
             >
-              Wager (coins)
+              Wager
             </label>
-            <Input
-              id="teenpatti-wager"
-              data-ocid="teenpatti.input"
+            <input
+              id="teen-patti-wager"
+              data-ocid="teen_patti.wager.input"
               type="number"
-              min={1}
+              min={10}
               value={wager}
-              onChange={(e) => setWager(e.target.value)}
-              disabled={state === "dealt"}
+              onChange={(e) => setWager(Math.max(10, Number(e.target.value)))}
+              disabled={gameState !== "idle"}
+              className="w-full px-4 py-2 rounded-lg text-white outline-none"
               style={{
-                background: "oklch(0.14 0 0)",
-                border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-                color: "oklch(0.97 0 0)",
+                border: "1px solid oklch(0.62 0.13 78 / 0.4)",
+                background: "oklch(0.08 0 0)",
               }}
             />
           </div>
+          <div className="pt-6 text-right">
+            <span className="text-xs text-muted-foreground">
+              Balance:{" "}
+              <span style={{ color: "oklch(0.85 0.18 85)" }}>
+                {balance !== undefined ? Number(balance).toLocaleString() : "—"}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="flex gap-3 mt-auto">
-          {state === "idle" && (
-            <Button
-              data-ocid="teenpatti.primary_button"
-              onClick={deal}
-              className="flex-1 font-bold uppercase tracking-wider py-6 text-base"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                color: "oklch(0.07 0 0)",
-                border: "none",
-              }}
-            >
-              🃏 DEAL CARDS
-            </Button>
-          )}
-          {state === "dealt" && (
-            <Button
-              data-ocid="teenpatti.secondary_button"
-              onClick={reveal}
-              className="flex-1 font-bold uppercase tracking-wider py-6 text-base"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                color: "oklch(0.07 0 0)",
-                border: "none",
-              }}
-            >
-              👁 REVEAL DEALER
-            </Button>
-          )}
-          {state === "revealed" && (
-            <Button
-              data-ocid="teenpatti.primary_button"
-              onClick={reset}
-              className="flex-1 font-bold uppercase tracking-wider py-6 text-base"
-              style={{
-                background: "oklch(0.17 0 0)",
-                border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-                color: "oklch(0.85 0.18 85)",
-              }}
-            >
-              🔄 PLAY AGAIN
-            </Button>
-          )}
-        </div>
+        {gameState === "result" ? (
+          <button
+            type="button"
+            data-ocid="teen_patti.deal_again.button"
+            onClick={handleAgain}
+            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-opacity hover:opacity-90"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+              color: "oklch(0.07 0 0)",
+            }}
+          >
+            🃏 Deal Again
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-ocid="teen_patti.deal.primary_button"
+            onClick={handleDeal}
+            disabled={gameState !== "idle" || !actor || wager < 10}
+            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+              color: "oklch(0.07 0 0)",
+            }}
+          >
+            {isDealing ? "Dealing Cards…" : "🃏 Deal Cards"}
+          </button>
+        )}
       </div>
     </div>
   );

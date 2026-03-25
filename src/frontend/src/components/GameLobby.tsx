@@ -1,7 +1,9 @@
 import { ChevronLeft } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import AviatorGame from "./games/AviatorGame";
 import RouletteGame from "./games/RouletteGame";
+import TeenPattiGame from "./games/TeenPattiGame";
 
 type Game = "aviator" | "roulette" | "teenPatti";
 
@@ -219,7 +221,6 @@ const AviatorSVG = (
       </filter>
     </defs>
     <rect width="200" height="160" fill="url(#av-bg)" />
-    {/* Static stars - no array map needed */}
     <circle cx="20" cy="20" r="1" fill="white" opacity="0.4" />
     <circle cx="50" cy="10" r="1" fill="white" opacity="0.6" />
     <circle cx="80" cy="30" r="1" fill="white" opacity="0.8" />
@@ -229,12 +230,10 @@ const AviatorSVG = (
     <circle cx="170" cy="50" r="1" fill="white" opacity="0.4" />
     <circle cx="30" cy="50" r="1" fill="white" opacity="0.6" />
     <circle cx="140" cy="40" r="1" fill="white" opacity="0.8" />
-    {/* Trajectory curve fill */}
     <path
       d="M10,145 Q60,140 100,110 Q140,80 185,25 L185,155 L10,155 Z"
       fill="oklch(0.85 0.18 85 / 0.06)"
     />
-    {/* Trajectory curve line */}
     <path
       d="M10,145 Q60,140 100,110 Q140,80 185,25"
       fill="none"
@@ -242,7 +241,6 @@ const AviatorSVG = (
       strokeWidth="2.5"
       strokeLinecap="round"
     />
-    {/* Glow on curve */}
     <path
       d="M10,145 Q60,140 100,110 Q140,80 185,25"
       fill="none"
@@ -250,7 +248,6 @@ const AviatorSVG = (
       strokeWidth="5"
       filter="url(#av-glow)"
     />
-    {/* Airplane */}
     <g transform="translate(175, 28) rotate(-35)">
       <ellipse cx="0" cy="0" rx="10" ry="4" fill="url(#av-gold)" />
       <ellipse cx="7" cy="-1" rx="4" ry="2.5" fill="oklch(0.90 0.15 85)" />
@@ -258,7 +255,6 @@ const AviatorSVG = (
       <polygon points="-2,4 -8,12 -12,4" fill="oklch(0.75 0.16 82)" />
       <polygon points="-9,-2 -14,-7 -10,-2" fill="oklch(0.62 0.13 78)" />
     </g>
-    {/* Multiplier text */}
     <text
       x="18"
       y="75"
@@ -270,7 +266,6 @@ const AviatorSVG = (
     >
       2.47x
     </text>
-    {/* Grid lines */}
     <line
       x1="10"
       y1="155"
@@ -376,7 +371,6 @@ const TeenPattiSVG = (
       stroke="oklch(0.85 0.18 85 / 0.08)"
       strokeWidth="1"
     />
-    {/* Left card */}
     <g transform="translate(68, 80) rotate(-18)">
       <rect
         x="-22"
@@ -420,7 +414,6 @@ const TeenPattiSVG = (
         A
       </text>
     </g>
-    {/* Right card */}
     <g transform="translate(132, 80) rotate(18)">
       <rect
         x="-22"
@@ -464,7 +457,6 @@ const TeenPattiSVG = (
         K
       </text>
     </g>
-    {/* Center card */}
     <g transform="translate(100, 78)">
       <rect
         x="-24"
@@ -519,7 +511,6 @@ const TeenPattiSVG = (
         Q
       </text>
     </g>
-    {/* Gold chip */}
     <circle
       cx="100"
       cy="135"
@@ -641,7 +632,7 @@ export default function GameLobby() {
                           color: "oklch(0.07 0 0)",
                         }}
                       >
-                        {card.id === "roulette" ? "Play Now" : "Coming Soon"}
+                        Play Now
                       </div>
                     </div>
                   </motion.button>
@@ -676,40 +667,9 @@ export default function GameLobby() {
                 </span>
               </button>
             </div>
-            {selectedGame === "roulette" ? (
-              <RouletteGame />
-            ) : (
-              <div
-                className="flex flex-col items-center justify-center min-h-[60vh] rounded-2xl"
-                style={{
-                  background: "oklch(0.10 0 0)",
-                  border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-                }}
-              >
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, oklch(0.87 0.19 85 / 0.15), oklch(0.62 0.13 78 / 0.1))",
-                    border: "1px solid oklch(0.85 0.18 85 / 0.3)",
-                  }}
-                >
-                  <span className="text-4xl">
-                    {selectedGame === "aviator" ? "\u2708" : "\uD83C\uDCCF"}
-                  </span>
-                </div>
-                <h2 className="font-display text-3xl font-bold uppercase tracking-widest mb-3 gold-gradient-text">
-                  {selectedCard?.title}
-                </h2>
-                <p className="text-muted-foreground text-lg tracking-wide mb-8">
-                  Coming Soon
-                </p>
-                <p className="text-sm text-muted-foreground max-w-xs text-center">
-                  This game is currently under development. Stay tuned for an
-                  incredible experience.
-                </p>
-              </div>
-            )}
+            {selectedGame === "roulette" && <RouletteGame />}
+            {selectedGame === "aviator" && <AviatorGame />}
+            {selectedGame === "teenPatti" && <TeenPattiGame />}
           </motion.div>
         )}
       </AnimatePresence>

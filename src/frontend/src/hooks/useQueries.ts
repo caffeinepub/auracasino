@@ -5,7 +5,7 @@ import type {
   RouletteBet,
   UserProfile,
   UserStatProfile,
-} from "../backend.d";
+} from "../backend";
 import { useActor } from "./useActor";
 
 const RED_NUMBERS = new Set([
