@@ -1,6 +1,16 @@
-import { ChevronLeft } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ChevronLeft, Loader2, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { usePlayerSession } from "../contexts/PlayerSessionContext";
+import { getAnonActor } from "../utils/anonActor";
 import AviatorGame from "./games/AviatorGame";
 import RouletteGame from "./games/RouletteGame";
 import TeenPattiGame from "./games/TeenPattiGame";
@@ -554,12 +564,205 @@ const GAME_CARDS = [
   },
 ];
 
+function LoginModal({
+  open,
+  onClose,
+  onSuccess,
+  gameName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  gameName: string;
+}) {
+  const { setSession } = usePlayerSession();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin() {
+    if (!username.trim() || !password.trim()) {
+      setError("Please enter your username and password.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      const actor = await getAnonActor();
+      const res = await (actor as any).playerLogin(username.trim(), password);
+      if (res.success) {
+        setSession({
+          username: username.trim(),
+          password,
+          balance: Number(res.balance),
+        });
+        onSuccess();
+      } else {
+        setError(res.message || "Invalid credentials. Please try again.");
+      }
+    } catch {
+      setError("Connection error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleLogin();
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent
+        style={{
+          background: "oklch(0.10 0 0)",
+          border: "1px solid oklch(0.62 0.13 78 / 0.4)",
+          boxShadow: "0 0 60px oklch(0.85 0.18 85 / 0.1)",
+        }}
+      >
+        <DialogHeader>
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+                boxShadow: "0 0 24px oklch(0.85 0.18 85 / 0.3)",
+              }}
+            >
+              <Lock className="w-6 h-6" style={{ color: "oklch(0.07 0 0)" }} />
+            </div>
+            <DialogTitle
+              className="font-display uppercase tracking-widest text-lg text-center"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Login to Play
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground text-center">
+              Enter your credentials to access{" "}
+              <span style={{ color: "oklch(0.85 0.18 85)" }}>{gameName}</span>
+            </p>
+          </div>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4 mt-2">
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="modal-username"
+              className="text-xs uppercase tracking-wider"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Username
+            </Label>
+            <Input
+              id="modal-username"
+              data-ocid="login.input"
+              type="text"
+              placeholder="Enter your username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoComplete="username"
+              className="bg-transparent border-[oklch(0.62_0.13_78_/_0.3)] focus:border-[oklch(0.85_0.18_85)] text-white placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="modal-password"
+              className="text-xs uppercase tracking-wider"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            >
+              Password
+            </Label>
+            <Input
+              id="modal-password"
+              data-ocid="login.textarea"
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoComplete="current-password"
+              className="bg-transparent border-[oklch(0.62_0.13_78_/_0.3)] focus:border-[oklch(0.85_0.18_85)] text-white placeholder:text-muted-foreground"
+            />
+          </div>
+
+          {error && (
+            <p
+              data-ocid="login.error_state"
+              className="text-sm"
+              style={{ color: "oklch(0.72 0.25 25)" }}
+            >
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            data-ocid="login.primary_button"
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full h-12 text-base font-bold tracking-widest uppercase rounded-lg transition-all duration-300 hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+              color: "oklch(0.07 0 0)",
+              boxShadow: "0 4px 24px oklch(0.85 0.18 85 / 0.3)",
+              border: "none",
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Verifying...
+              </>
+            ) : (
+              "Login & Play"
+            )}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GameLobby() {
+  const { session } = usePlayerSession();
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [pendingGame, setPendingGame] = useState<Game | null>(null);
   const selectedCard = GAME_CARDS.find((c) => c.id === selectedGame);
+
+  function handleCardClick(gameId: Game) {
+    if (session) {
+      setSelectedGame(gameId);
+    } else {
+      setPendingGame(gameId);
+    }
+  }
+
+  function handleLoginSuccess() {
+    if (pendingGame) {
+      setSelectedGame(pendingGame);
+      setPendingGame(null);
+    }
+  }
+
+  const pendingCard = GAME_CARDS.find((c) => c.id === pendingGame);
 
   return (
     <div className="w-full">
+      <LoginModal
+        open={!!pendingGame}
+        onClose={() => setPendingGame(null)}
+        onSuccess={handleLoginSuccess}
+        gameName={pendingCard?.title ?? ""}
+      />
+
       <AnimatePresence mode="wait">
         {selectedGame === null ? (
           <motion.div
@@ -586,7 +789,7 @@ export default function GameLobby() {
                     }}
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setSelectedGame(card.id)}
+                    onClick={() => handleCardClick(card.id)}
                     className="group relative flex flex-col items-center rounded-2xl overflow-hidden cursor-pointer text-left w-full transition-all duration-300"
                     style={{
                       background: "oklch(0.10 0 0)",
@@ -625,14 +828,15 @@ export default function GameLobby() {
                         {card.subtitle}
                       </p>
                       <div
-                        className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70"
+                        className="mt-4 px-6 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 group-hover:opacity-100 opacity-70 flex items-center gap-2"
                         style={{
                           background:
                             "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
                           color: "oklch(0.07 0 0)",
                         }}
                       >
-                        Play Now
+                        {!session && <Lock className="w-3 h-3" />}
+                        {session ? "Play Now" : "Login to Play"}
                       </div>
                     </div>
                   </motion.button>

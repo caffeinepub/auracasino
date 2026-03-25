@@ -4,7 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { RouletteBet } from "../../backend.d";
-import { usePlayRouletteMulti } from "../../hooks/useQueries";
+import { usePlayerSession } from "../../contexts/PlayerSessionContext";
+import { usePlayerPlayRouletteMulti } from "../../hooks/useQueries";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export default function RouletteGame() {
   const [totalPayout, setTotalPayout] = useState<number | null>(null);
   const [didWin, setDidWin] = useState<boolean | null>(null);
 
-  const playRouletteMulti = usePlayRouletteMulti();
+  const playRouletteMulti = usePlayerPlayRouletteMulti();
 
   const totalBet = Array.from(bets.values()).reduce((a, b) => a + b, 0);
 

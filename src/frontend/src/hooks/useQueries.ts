@@ -6,6 +6,7 @@ import type {
   UserProfile,
   UserStatProfile,
 } from "../backend";
+import { usePlayerSession } from "../contexts/PlayerSessionContext";
 import { useActor } from "./useActor";
 
 const RED_NUMBERS = new Set([
@@ -94,6 +95,18 @@ export function useAdminUsers() {
   });
 }
 
+export function useAdminPlayerWallets() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Array<{ username: string; balance: bigint }>>({
+    queryKey: ["adminPlayerWallets"],
+    queryFn: async () => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).adminGetPlayerWallets();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
 export function useTopUp() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -146,10 +159,6 @@ export function usePlayRoulette() {
   });
 }
 
-/**
- * Multi-bet roulette: uses playRoulette for the first bet to get a canonical
- * rolled number, then calculates client-side payouts for all remaining bets.
- */
 export function usePlayRouletteMulti() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -157,8 +166,6 @@ export function usePlayRouletteMulti() {
     mutationFn: async (bets: RouletteBet[]): Promise<MultiPlayResult> => {
       if (!actor) throw new Error("Not connected");
       if (bets.length === 0) throw new Error("No bets placed");
-
-      // Use the first bet to get the rolled number from backend
       const first = bets[0];
       const firstResult = await actor.playRoulette(
         first.wager,
@@ -166,13 +173,10 @@ export function usePlayRouletteMulti() {
         first.betValue,
       );
       const rolled = Number(firstResult.result);
-
-      // Calculate total payout for all bets based on the same rolled number
       let totalPayout = 0;
       for (const bet of bets) {
         totalPayout += calcBetPayout(bet, rolled);
       }
-
       const win = totalPayout > 0;
       return {
         win,
@@ -186,6 +190,103 @@ export function usePlayRouletteMulti() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["balance"] });
       queryClient.invalidateQueries({ queryKey: ["userInfo"] });
+    },
+  });
+}
+
+// ─── Player hooks (anonymous actor + username/password credentials) ───────────
+
+export function usePlayerPlayRouletteMulti() {
+  const { actor } = useActor();
+  const { session, updateBalance } = usePlayerSession();
+  return useMutation({
+    mutationFn: async (bets: RouletteBet[]): Promise<MultiPlayResult> => {
+      if (!actor) throw new Error("Not connected");
+      if (!session) throw new Error("Not logged in");
+      if (bets.length === 0) throw new Error("No bets placed");
+      const res = await (actor as any).playerPlayRouletteMulti(
+        session.username,
+        session.password,
+        bets,
+      );
+      return res as MultiPlayResult;
+    },
+    onSuccess: async () => {
+      if (session && actor) {
+        try {
+          const bal = await (actor as any).playerGetBalance(
+            session.username,
+            session.password,
+          );
+          updateBalance(Number(bal));
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  });
+}
+
+export function usePlayerPlayAviator() {
+  const { actor } = useActor();
+  const { session, updateBalance } = usePlayerSession();
+  return useMutation({
+    mutationFn: async ({
+      wager,
+      targetMultiplierX100,
+    }: { wager: number; targetMultiplierX100: number }) => {
+      if (!actor) throw new Error("Not connected");
+      if (!session) throw new Error("Not logged in");
+      const res = await (actor as any).playerPlayAviator(
+        session.username,
+        session.password,
+        BigInt(wager),
+        BigInt(targetMultiplierX100),
+      );
+      return res;
+    },
+    onSuccess: async () => {
+      if (session && actor) {
+        try {
+          const bal = await (actor as any).playerGetBalance(
+            session.username,
+            session.password,
+          );
+          updateBalance(Number(bal));
+        } catch {
+          /* ignore */
+        }
+      }
+    },
+  });
+}
+
+export function usePlayerPlayTeenPatti() {
+  const { actor } = useActor();
+  const { session, updateBalance } = usePlayerSession();
+  return useMutation({
+    mutationFn: async (wager: number) => {
+      if (!actor) throw new Error("Not connected");
+      if (!session) throw new Error("Not logged in");
+      const res = await (actor as any).playerPlayTeenPatti(
+        session.username,
+        session.password,
+        BigInt(wager),
+      );
+      return res;
+    },
+    onSuccess: async () => {
+      if (session && actor) {
+        try {
+          const bal = await (actor as any).playerGetBalance(
+            session.username,
+            session.password,
+          );
+          updateBalance(Number(bal));
+        } catch {
+          /* ignore */
+        }
+      }
     },
   });
 }

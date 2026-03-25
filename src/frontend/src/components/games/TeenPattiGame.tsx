@@ -1,8 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { useActor } from "../../hooks/useActor";
-import { useBalance } from "../../hooks/useQueries";
+import { usePlayerSession } from "../../contexts/PlayerSessionContext";
+import { usePlayerPlayTeenPatti } from "../../hooks/useQueries";
 
 const RANKS = [
   "A",
@@ -198,9 +197,8 @@ interface TeenPattiResult {
 type GameState = "idle" | "dealing" | "result";
 
 export default function TeenPattiGame() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  const { data: balance } = useBalance();
+  const { session } = usePlayerSession();
+  const playTeenPatti = usePlayerPlayTeenPatti();
 
   const [wager, setWager] = useState(100);
   const [gameState, setGameState] = useState<GameState>("idle");
@@ -209,14 +207,12 @@ export default function TeenPattiGame() {
   const placeholderCards = [0, 1, 2];
 
   async function handleDeal() {
-    if (!actor || gameState !== "idle") return;
+    if (gameState !== "idle") return;
     setResult(null);
     setGameState("dealing");
     try {
-      const res = await (actor as any).playTeenPatti(BigInt(wager));
+      const res = await playTeenPatti.mutateAsync(wager);
       setResult(res as TeenPattiResult);
-      queryClient.invalidateQueries({ queryKey: ["balance"] });
-      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     } catch (_e) {
       setResult(null);
     }
@@ -395,7 +391,7 @@ export default function TeenPattiGame() {
             <span className="text-xs text-muted-foreground">
               Balance:{" "}
               <span style={{ color: "oklch(0.85 0.18 85)" }}>
-                {balance !== undefined ? Number(balance).toLocaleString() : "—"}
+                {session ? session.balance.toLocaleString() : "—"}
               </span>
             </span>
           </div>
@@ -420,7 +416,7 @@ export default function TeenPattiGame() {
             type="button"
             data-ocid="teen_patti.deal.primary_button"
             onClick={handleDeal}
-            disabled={gameState !== "idle" || !actor || wager < 10}
+            disabled={gameState !== "idle" || !session || wager < 10}
             className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
             style={{
               background:

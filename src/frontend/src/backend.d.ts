@@ -78,15 +78,26 @@ export interface UserProfile {
     totalWagered: bigint;
     totalWon: bigint;
 }
+export interface LoginResult {
+    success: boolean;
+    balance: bigint;
+    message: string;
+}
+export interface PlayerWallet {
+    username: string;
+    balance: bigint;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
     guest = "guest"
 }
 export interface backendInterface {
+    adminAdjustBalance(username: string, amount: bigint, isAdd: boolean): Promise<string>;
     adminCreateUser(username: string, password: string): Promise<string>;
     adminGetAllUsers(): Promise<Array<UserStatProfile>>;
     adminGetCreatedUsers(): Promise<Array<string>>;
+    adminGetPlayerWallets(): Promise<Array<PlayerWallet>>;
     adminGetStats(): Promise<AdminStats>;
     adminTopUpUser(user: Principal, amount: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -98,6 +109,12 @@ export interface backendInterface {
     getUserInfo(): Promise<UserProfile>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    playerGetBalance(username: string, password: string): Promise<bigint>;
+    playerLogin(username: string, password: string): Promise<LoginResult>;
+    playerPlayAviator(username: string, password: string, wager: bigint, targetMultiplierX100: bigint): Promise<AviatorResult>;
+    playerPlayRoulette(username: string, password: string, wager: bigint, betType: string, betValue: bigint): Promise<PlayResult>;
+    playerPlayRouletteMulti(username: string, password: string, bets: Array<RouletteBet>): Promise<MultiPlayResult>;
+    playerPlayTeenPatti(username: string, password: string, wager: bigint): Promise<TeenPattiResult>;
     playAviator(wager: bigint, targetMultiplierX100: bigint): Promise<AviatorResult>;
     playHiLo(wager: bigint, guess: string, currentCard: bigint): Promise<HiLoResult>;
     playRoulette(wager: bigint, betType: string, betValue: bigint): Promise<PlayResult>;

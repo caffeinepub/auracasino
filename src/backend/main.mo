@@ -69,16 +69,16 @@ actor {
   public type AviatorResult = {
     win : Bool;
     payout : Nat;
-    crashPoint : Nat;  // crash multiplier * 100 (e.g. 250 = 2.50x)
+    crashPoint : Nat;
     message : Text;
   };
 
   public type TeenPattiResult = {
     win : Bool;
     payout : Nat;
-    playerCards : [Nat];  // 3 cards, 0-51
-    dealerCards : [Nat];  // 3 cards, 0-51
-    playerRank : Nat;     // 0=high card, 1=pair, 2=color, 3=seq, 4=pure seq, 5=trail
+    playerCards : [Nat];
+    dealerCards : [Nat];
+    playerRank : Nat;
     dealerRank : Nat;
     message : Text;
   };
@@ -95,12 +95,27 @@ actor {
     teenPattiStats : GameStats;
   };
 
+  public type LoginResult = {
+    success : Bool;
+    balance : Nat;
+    message : Text;
+  };
+
+  public type PlayerWallet = {
+    username : Text;
+    balance : Nat;
+  };
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
+  // Admin-created user credentials: username -> password
   let createdUsers = Map.empty<Text, Text>();
+  // Player wallets keyed by username
+  let playerWallets = Map.empty<Text, Nat>();
 
   let initialBalance = 1000;
+  // II-based wallets (legacy)
   let users = Map.empty<Principal, UserProfile>();
   var totalWagered : Nat = 0;
   var totalPaidOut : Nat = 0;
@@ -130,7 +145,165 @@ actor {
     { totalWagered = stats.totalWagered + wager; totalPaidOut = stats.totalPaidOut + payout; playCount = stats.playCount + 1 };
   };
 
-  // Force claim admin using the admin token (overrides existing admin)
+  // Validate player credentials, return (isValid, balance)
+  func validatePlayer(username : Text, password : Text) : (Bool, Nat) {
+    switch (createdUsers.get(username)) {
+      case (null) { (false, 0) };
+      case (?storedPw) {
+        if (storedPw != password) { (false, 0) }
+        else {
+          let bal = switch (playerWallets.get(username)) {
+            case (?b) { b };
+            case (null) {
+              playerWallets.add(username, initialBalance);
+              initialBalance;
+            };
+          };
+          (true, bal);
+        };
+      };
+    };
+  };
+
+  func getPlayerBalance(username : Text) : Nat {
+    switch (playerWallets.get(username)) {
+      case (?b) { b };
+      case (null) { initialBalance };
+    };
+  };
+
+  func setPlayerBalance(username : Text, balance : Nat) {
+    playerWallets.add(username, balance);
+  };
+
+  // Player login
+  public query func playerLogin(username : Text, password : Text) : async LoginResult {
+    let (valid, balance) = validatePlayer(username, password);
+    if (valid) {
+      { success = true; balance; message = "Login successful" };
+    } else if (createdUsers.containsKey(username)) {
+      { success = false; balance = 0; message = "Incorrect password" };
+    } else {
+      { success = false; balance = 0; message = "Username not found" };
+    };
+  };
+
+  public query func playerGetBalance(username : Text, password : Text) : async Nat {
+    let (valid, balance) = validatePlayer(username, password);
+    if (not valid) { Runtime.trap("Invalid credentials") };
+    balance;
+  };
+
+  public shared func playerPlayRoulette(username : Text, password : Text, wager : Nat, betType : Text, betValue : Nat) : async PlayResult {
+    let (valid, balance) = validatePlayer(username, password);
+    if (not valid) { Runtime.trap("Invalid credentials") };
+    if (balance < wager) { return { win = false; payout = 0; result = 0; message = "Insufficient balance" } };
+    let rng = await Random.natRange(0, 37);
+    let payout = calcSingleBetPayout(wager, betType, betValue, rng);
+    setPlayerBalance(username, balance - wager + payout);
+    totalWagered += wager;
+    totalPaidOut += payout;
+    rouletteStats := updateGameStats(rouletteStats, wager, payout);
+    { win = payout > 0; payout; result = rng; message = "Roulette result: " # rng.toText() };
+  };
+
+  public shared func playerPlayRouletteMulti(username : Text, password : Text, bets : [RouletteBet]) : async MultiPlayResult {
+    let (valid, balance) = validatePlayer(username, password);
+    if (not valid) { Runtime.trap("Invalid credentials") };
+    if (bets.size() == 0) { Runtime.trap("No bets placed") };
+    var totalBetWager : Nat = 0;
+    for (bet in bets.vals()) { totalBetWager += bet.wager };
+    if (balance < totalBetWager) { return { win = false; totalPayout = 0; result = 0; message = "Insufficient balance" } };
+    let rng = await Random.natRange(0, 37);
+    var totalPayout : Nat = 0;
+    for (bet in bets.vals()) { totalPayout += calcSingleBetPayout(bet.wager, bet.betType, bet.betValue, rng) };
+    setPlayerBalance(username, balance - totalBetWager + totalPayout);
+    totalWagered += totalBetWager;
+    totalPaidOut += totalPayout;
+    rouletteStats := updateGameStats(rouletteStats, totalBetWager, totalPayout);
+    { win = totalPayout > 0; totalPayout; result = rng; message = "Roulette result: " # rng.toText() };
+  };
+
+  public shared func playerPlayAviator(username : Text, password : Text, wager : Nat, targetMultiplierX100 : Nat) : async AviatorResult {
+    let (valid, balance) = validatePlayer(username, password);
+    if (not valid) { Runtime.trap("Invalid credentials") };
+    if (targetMultiplierX100 < 110) { Runtime.trap("Minimum cashout is 1.10x") };
+    if (balance < wager) {
+      return { win = false; payout = 0; crashPoint = 100; message = "Insufficient balance" };
+    };
+    let rng = await Random.natRange(100, 1001);
+    let win = targetMultiplierX100 <= rng;
+    let payout = if (win) { wager * targetMultiplierX100 / 100 } else { 0 };
+    setPlayerBalance(username, balance - wager + payout);
+    totalWagered += wager;
+    totalPaidOut += payout;
+    aviatorStats := updateGameStats(aviatorStats, wager, payout);
+    let msg = if (win) { "Cashed out at " # (targetMultiplierX100 / 100).toText() # "." # (targetMultiplierX100 % 100).toText() # "x!" }
+              else { "Crashed at " # (rng / 100).toText() # "." # (rng % 100).toText() # "x" };
+    { win; payout; crashPoint = rng; message = msg };
+  };
+
+  public shared func playerPlayTeenPatti(username : Text, password : Text, wager : Nat) : async TeenPattiResult {
+    let (valid, balance) = validatePlayer(username, password);
+    if (not valid) { Runtime.trap("Invalid credentials") };
+    if (balance < wager) {
+      return { win = false; payout = 0; playerCards = [0, 0, 0]; dealerCards = [0, 0, 0]; playerRank = 0; dealerRank = 0; message = "Insufficient balance" };
+    };
+    let p1 = await Random.natRange(0, 52);
+    let p2 = await Random.natRange(0, 52);
+    let p3 = await Random.natRange(0, 52);
+    let d1 = await Random.natRange(0, 52);
+    let d2 = await Random.natRange(0, 52);
+    let d3 = await Random.natRange(0, 52);
+    let playerRank = teenPattiHandRank(p1, p2, p3);
+    let dealerRank = teenPattiHandRank(d1, d2, d3);
+    let win = playerRank > dealerRank or (playerRank == dealerRank and teenPattiHighCard(p1, p2, p3) > teenPattiHighCard(d1, d2, d3));
+    let payout = if (win) { wager * 2 } else { 0 };
+    setPlayerBalance(username, balance - wager + payout);
+    totalWagered += wager;
+    totalPaidOut += payout;
+    teenPattiStats := updateGameStats(teenPattiStats, wager, payout);
+    let handName = func(r : Nat) : Text {
+      if (r == 5) { "Trail" } else if (r == 4) { "Pure Sequence" } else if (r == 3) { "Sequence" } else if (r == 2) { "Color" } else if (r == 1) { "Pair" } else { "High Card" };
+    };
+    let msg = if (win) { "You win! Your " # handName(playerRank) # " beats dealer's " # handName(dealerRank) }
+              else { "Dealer wins. " # handName(dealerRank) # " beats your " # handName(playerRank) };
+    { win; payout; playerCards = [p1, p2, p3]; dealerCards = [d1, d2, d3]; playerRank; dealerRank; message = msg };
+  };
+
+  // Admin wallet control
+  public query ({ caller }) func adminGetPlayerWallets() : async [PlayerWallet] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized");
+    };
+    let usersArray = createdUsers.toArray();
+    usersArray.map(func((username, _)) : PlayerWallet {
+      let balance = switch (playerWallets.get(username)) {
+        case (?b) { b };
+        case (null) { 0 };
+      };
+      { username; balance };
+    });
+  };
+
+  public shared ({ caller }) func adminAdjustBalance(username : Text, amount : Nat, isAdd : Bool) : async Text {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized");
+    };
+    if (not createdUsers.containsKey(username)) {
+      return "User not found";
+    };
+    let current = getPlayerBalance(username);
+    let newBalance = if (isAdd) {
+      current + amount;
+    } else {
+      if (amount >= current) { 0 } else { current - amount };
+    };
+    setPlayerBalance(username, newBalance);
+    "Balance updated: " # username # " now has " # newBalance.toText() # " coins";
+  };
+
+  // Force claim admin using the admin token
   public shared ({ caller }) func forceClaimAdmin(secret : Text) : async Text {
     switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
       case (null) { Runtime.trap("Admin token not configured") };
@@ -143,19 +316,20 @@ actor {
     };
   };
 
-  // Created user functions
+  // Admin creates a player account; wallet initialized to 1000
   public shared ({ caller }) func adminCreateUser(username : Text, password : Text) : async Text {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can create users");
     };
     if (createdUsers.containsKey(username)) { return "Username already exists" };
     createdUsers.add(username, password);
+    playerWallets.add(username, initialBalance);
     "User created successfully";
   };
 
   public query ({ caller }) func adminGetCreatedUsers() : async [Text] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can get created users");
+      Runtime.trap("Unauthorized");
     };
     let usersArray = createdUsers.toArray();
     let sortedUsers = usersArray.sort(func(a, b) { Text.compare(a.0, b.0) });
@@ -164,28 +338,28 @@ actor {
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view profiles");
+      Runtime.trap("Unauthorized");
     };
     users.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
+      Runtime.trap("Unauthorized");
     };
     users.get(user);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
+      Runtime.trap("Unauthorized");
     };
     users.add(caller, profile);
   };
 
   public shared ({ caller }) func register() : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only authenticated users can register");
+      Runtime.trap("Unauthorized");
     };
     switch (users.get(caller)) {
       case (?_) { Runtime.trap("User already registered") };
@@ -198,7 +372,7 @@ actor {
 
   public shared ({ caller }) func topUp(amount : Nat) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can top up");
+      Runtime.trap("Unauthorized");
     };
     if (amount > 500) { Runtime.trap("Top up failed. Amount must not exceed 500") };
     let user = getUserOrRegister(caller);
@@ -207,14 +381,14 @@ actor {
 
   public query ({ caller }) func getBalance() : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view balance");
+      Runtime.trap("Unauthorized");
     };
     switch (users.get(caller)) { case (?user) { user.balance }; case (null) { initialBalance } };
   };
 
   public query ({ caller }) func getUserInfo() : async UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view user info");
+      Runtime.trap("Unauthorized");
     };
     getUserOrRegister(caller);
   };
@@ -241,7 +415,7 @@ actor {
 
   public shared ({ caller }) func playRoulette(wager : Nat, betType : Text, betValue : Nat) : async PlayResult {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can play roulette");
+      Runtime.trap("Unauthorized");
     };
     let user = getUserOrRegister(caller);
     if (user.balance < wager) { return { win = false; payout = 0; result = 0; message = "Insufficient balance" } };
@@ -256,7 +430,7 @@ actor {
 
   public shared ({ caller }) func playRouletteMulti(bets : [RouletteBet]) : async MultiPlayResult {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can play roulette");
+      Runtime.trap("Unauthorized");
     };
     if (bets.size() == 0) { Runtime.trap("No bets placed") };
     var totalBetWager : Nat = 0;
@@ -273,18 +447,15 @@ actor {
     { win = totalPayout > 0; totalPayout; result = rng; message = "Roulette result: " # rng.toText() };
   };
 
-  // Aviator game: player sets target cashout multiplier (x100 integer)
-  // Backend generates crash point; if target <= crash point, player wins
   public shared ({ caller }) func playAviator(wager : Nat, targetMultiplierX100 : Nat) : async AviatorResult {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can play Aviator");
+      Runtime.trap("Unauthorized");
     };
     if (targetMultiplierX100 < 110) { Runtime.trap("Minimum cashout is 1.10x") };
     let user = getUserOrRegister(caller);
     if (user.balance < wager) {
       return { win = false; payout = 0; crashPoint = 100; message = "Insufficient balance" };
     };
-    // Generate crash point: 100 (1.00x) to 1000 (10.00x), house edge via distribution
     let rng = await Random.natRange(100, 1001);
     let win = targetMultiplierX100 <= rng;
     let payout = if (win) { wager * targetMultiplierX100 / 100 } else { 0 };
@@ -292,15 +463,13 @@ actor {
     totalWagered += wager;
     totalPaidOut += payout;
     aviatorStats := updateGameStats(aviatorStats, wager, payout);
-    let msg = if (win) { "Cashed out at " # (targetMultiplierX100 / 100).toText() # "." # (targetMultiplierX100 % 100).toText() # "x! Crash was " # (rng / 100).toText() # "." # (rng % 100).toText() # "x" }
-              else { "Crashed at " # (rng / 100).toText() # "." # (rng % 100).toText() # "x before your " # (targetMultiplierX100 / 100).toText() # "." # (targetMultiplierX100 % 100).toText() # "x cashout" };
+    let msg = if (win) { "Cashed out at " # (targetMultiplierX100 / 100).toText() # "." # (targetMultiplierX100 % 100).toText() # "x!" }
+              else { "Crashed at " # (rng / 100).toText() # "." # (rng % 100).toText() # "x" };
     { win; payout; crashPoint = rng; message = msg };
   };
 
-  // Teen Patti: deal 3 cards each, compare hand ranks
-  func cardRank(c : Nat) : Nat { c % 13 };  // 0=Ace,1=2,...,12=King
+  func cardRank(c : Nat) : Nat { c % 13 };
   func cardSuit(c : Nat) : Nat { c / 13 };
-
   func minNat(a : Nat, b : Nat) : Nat { if (a < b) a else b };
   func maxNat(a : Nat, b : Nat) : Nat { if (a > b) a else b };
 
@@ -322,7 +491,6 @@ actor {
     let isTrail = r1 == r2 and r2 == r3;
     let isPair = r1 == r2 or r2 == r3 or r1 == r3;
     let (lo, mid, hi) = sortThreeNat(r1, r2, r3);
-    // Sequence: consecutive ranks (including A-K-Q wrap: 0,11,12)
     let isSeq = (hi - lo == 2 and mid - lo == 1) or (lo == 0 and mid == 11 and hi == 12);
     if (isTrail) { 5 }
     else if (isFlush and isSeq) { 4 }
@@ -338,13 +506,12 @@ actor {
 
   public shared ({ caller }) func playTeenPatti(wager : Nat) : async TeenPattiResult {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can play Teen Patti");
+      Runtime.trap("Unauthorized");
     };
     let user = getUserOrRegister(caller);
     if (user.balance < wager) {
       return { win = false; payout = 0; playerCards = [0, 0, 0]; dealerCards = [0, 0, 0]; playerRank = 0; dealerRank = 0; message = "Insufficient balance" };
     };
-    // Deal cards (0-51)
     let p1 = await Random.natRange(0, 52);
     let p2 = await Random.natRange(0, 52);
     let p3 = await Random.natRange(0, 52);
@@ -360,19 +527,13 @@ actor {
     totalPaidOut += payout;
     teenPattiStats := updateGameStats(teenPattiStats, wager, payout);
     let handName = func(r : Nat) : Text {
-      if (r == 5) { "Trail" }
-      else if (r == 4) { "Pure Sequence" }
-      else if (r == 3) { "Sequence" }
-      else if (r == 2) { "Color" }
-      else if (r == 1) { "Pair" }
-      else { "High Card" };
+      if (r == 5) { "Trail" } else if (r == 4) { "Pure Sequence" } else if (r == 3) { "Sequence" } else if (r == 2) { "Color" } else if (r == 1) { "Pair" } else { "High Card" };
     };
     let msg = if (win) { "You win! Your " # handName(playerRank) # " beats dealer's " # handName(dealerRank) }
-              else { "Dealer wins. Dealer's " # handName(dealerRank) # " beats your " # handName(playerRank) };
+              else { "Dealer wins. " # handName(dealerRank) # " beats your " # handName(playerRank) };
     { win; payout; playerCards = [p1, p2, p3]; dealerCards = [d1, d2, d3]; playerRank; dealerRank; message = msg };
   };
 
-  // Legacy slots/hilo kept for backward compat
   public shared ({ caller }) func playSlots(wager : Nat) : async SlotsResult {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) { Runtime.trap("Unauthorized") };
     let user = getUserOrRegister(caller);

@@ -13,15 +13,22 @@ import {
   BarChart3,
   DollarSign,
   Loader2,
+  Minus,
+  Plus,
   TrendingDown,
   TrendingUp,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useActor } from "../hooks/useActor";
-import { useAdminStats, useAdminUsers } from "../hooks/useQueries";
+import {
+  useAdminPlayerWallets,
+  useAdminStats,
+  useAdminUsers,
+} from "../hooks/useQueries";
 
 function StatCard({
   icon: Icon,
@@ -63,6 +70,224 @@ function StatCard({
       </p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
+  );
+}
+
+function WalletControlSection() {
+  const { actor } = useActor();
+  const { data: wallets, isLoading, refetch } = useAdminPlayerWallets();
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [feedback, setFeedback] = useState<
+    Record<string, { msg: string; ok: boolean }>
+  >({});
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+
+  async function handleAdjust(username: string, isAdd: boolean) {
+    const raw = amounts[username];
+    const amt = Number(raw);
+    if (!amt || amt < 1) {
+      setFeedback((p) => ({
+        ...p,
+        [username]: { msg: "Enter a valid amount (min 1)", ok: false },
+      }));
+      return;
+    }
+    setPending((p) => ({ ...p, [username]: true }));
+    setFeedback((p) => ({ ...p, [username]: { msg: "", ok: true } }));
+    try {
+      const result = await (actor as any).adminAdjustBalance(
+        username,
+        BigInt(amt),
+        isAdd,
+      );
+      setFeedback((p) => ({
+        ...p,
+        [username]: {
+          msg: result,
+          ok: result.toLowerCase().includes("success"),
+        },
+      }));
+      setAmounts((p) => ({ ...p, [username]: "" }));
+      refetch();
+    } catch (_e) {
+      setFeedback((p) => ({
+        ...p,
+        [username]: { msg: "Error adjusting balance", ok: false },
+      }));
+    } finally {
+      setPending((p) => ({ ...p, [username]: false }));
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="rounded-xl mb-8 overflow-hidden"
+      style={{ border: "1px solid oklch(0.62 0.13 78 / 0.3)" }}
+    >
+      <div
+        className="px-5 py-4 flex items-center gap-2"
+        style={{
+          background: "oklch(0.12 0 0)",
+          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
+        }}
+      >
+        <Wallet className="w-4 h-4" style={{ color: "oklch(0.85 0.18 85)" }} />
+        <h3
+          className="font-semibold uppercase tracking-wider text-sm"
+          style={{ color: "oklch(0.85 0.18 85)" }}
+        >
+          Wallet Control
+        </h3>
+      </div>
+      <div style={{ background: "oklch(0.10 0 0)" }}>
+        {isLoading ? (
+          <div
+            data-ocid="admin.wallets.loading_state"
+            className="flex items-center justify-center py-10"
+          >
+            <Loader2
+              className="w-5 h-5 animate-spin"
+              style={{ color: "oklch(0.85 0.18 85)" }}
+            />
+          </div>
+        ) : wallets && wallets.length > 0 ? (
+          <Table data-ocid="admin.wallets.table">
+            <TableHeader>
+              <TableRow style={{ borderColor: "oklch(0.62 0.13 78 / 0.2)" }}>
+                {[
+                  "Username",
+                  "Balance",
+                  "Add Coins",
+                  "Deduct Coins",
+                  "Status",
+                ].map((h) => (
+                  <TableHead
+                    key={h}
+                    className="text-xs uppercase tracking-wider"
+                    style={{ color: "oklch(0.85 0.18 85)" }}
+                  >
+                    {h}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {wallets.map((w, i) => (
+                <TableRow
+                  key={w.username}
+                  data-ocid={`admin.wallets.item.${i + 1}`}
+                  style={{ borderColor: "oklch(0.62 0.13 78 / 0.1)" }}
+                >
+                  <TableCell className="font-semibold text-sm">
+                    {w.username}
+                  </TableCell>
+                  <TableCell
+                    className="font-bold tabular-nums"
+                    style={{ color: "oklch(0.85 0.18 85)" }}
+                  >
+                    {Number(w.balance).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <input
+                        data-ocid={`admin.wallets.add.input.${i + 1}`}
+                        type="number"
+                        min={1}
+                        placeholder="Amount"
+                        value={amounts[w.username] ?? ""}
+                        onChange={(e) =>
+                          setAmounts((p) => ({
+                            ...p,
+                            [w.username]: e.target.value,
+                          }))
+                        }
+                        className="w-24 px-2 py-1.5 rounded text-sm text-white outline-none"
+                        style={{
+                          background: "oklch(0.08 0 0)",
+                          border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        data-ocid={`admin.wallets.add.button.${i + 1}`}
+                        onClick={() => handleAdjust(w.username, true)}
+                        disabled={pending[w.username]}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-80 disabled:opacity-50"
+                        style={{
+                          background: "oklch(0.45 0.18 155)",
+                          color: "oklch(0.97 0.01 85)",
+                        }}
+                      >
+                        <Plus className="w-3 h-3" /> Add
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <input
+                        data-ocid={`admin.wallets.deduct.input.${i + 1}`}
+                        type="number"
+                        min={1}
+                        placeholder="Amount"
+                        value={amounts[`${w.username}_deduct`] ?? ""}
+                        onChange={(e) =>
+                          setAmounts((p) => ({
+                            ...p,
+                            [`${w.username}_deduct`]: e.target.value,
+                          }))
+                        }
+                        className="w-24 px-2 py-1.5 rounded text-sm text-white outline-none"
+                        style={{
+                          background: "oklch(0.08 0 0)",
+                          border: "1px solid oklch(0.62 0.13 78 / 0.3)",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        data-ocid={`admin.wallets.deduct.button.${i + 1}`}
+                        onClick={() => handleAdjust(w.username, false)}
+                        disabled={pending[w.username]}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-80 disabled:opacity-50"
+                        style={{
+                          background: "oklch(0.45 0.22 25)",
+                          color: "oklch(0.97 0.01 85)",
+                        }}
+                      >
+                        <Minus className="w-3 h-3" /> Deduct
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {feedback[w.username]?.msg ? (
+                      <span
+                        className="text-xs font-medium"
+                        style={{
+                          color: feedback[w.username].ok
+                            ? "oklch(0.83 0.19 155)"
+                            : "oklch(0.72 0.25 25)",
+                        }}
+                      >
+                        {feedback[w.username].msg}
+                      </span>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div
+            data-ocid="admin.wallets.empty_state"
+            className="py-10 text-center text-muted-foreground text-sm"
+          >
+            No player accounts created yet
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -386,6 +611,9 @@ export default function AdminPage() {
 
       {/* Create User */}
       <CreateUserSection />
+
+      {/* Wallet Control */}
+      <WalletControlSection />
 
       {/* Users table */}
       <div

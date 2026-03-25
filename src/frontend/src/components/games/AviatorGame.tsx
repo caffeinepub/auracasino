@@ -1,8 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useActor } from "../../hooks/useActor";
-import { useBalance } from "../../hooks/useQueries";
+import { usePlayerSession } from "../../contexts/PlayerSessionContext";
+import { usePlayerPlayAviator } from "../../hooks/useQueries";
 
 type GameState = "idle" | "flying" | "result";
 
@@ -27,9 +26,8 @@ const STAR_POSITIONS = [
 ];
 
 export default function AviatorGame() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  const { data: balance } = useBalance();
+  const { session } = usePlayerSession();
+  const playAviator = usePlayerPlayAviator();
 
   const [wager, setWager] = useState(100);
   const [targetMultiplier, setTargetMultiplier] = useState(2.0);
@@ -58,21 +56,19 @@ export default function AviatorGame() {
   }, [gameState, targetMultiplier]);
 
   async function handleFly() {
-    if (!actor || gameState !== "idle") return;
+    if (gameState !== "idle") return;
     setResult(null);
     setDisplayMultiplier(1.0);
     setGameState("flying");
     await new Promise((r) => setTimeout(r, 2200));
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     try {
-      const res = await (actor as any).playAviator(
-        BigInt(wager),
-        BigInt(Math.round(targetMultiplier * 100)),
-      );
+      const res = await playAviator.mutateAsync({
+        wager,
+        targetMultiplierX100: Math.round(targetMultiplier * 100),
+      });
       setResult(res as AviatorResult);
       setDisplayMultiplier(Number(res.crashPoint) / 100);
-      queryClient.invalidateQueries({ queryKey: ["balance"] });
-      queryClient.invalidateQueries({ queryKey: ["userInfo"] });
     } catch (_e) {
       setResult(null);
     }
@@ -333,8 +329,7 @@ export default function AviatorGame() {
           <span className="text-xs text-muted-foreground">
             Balance:{" "}
             <span style={{ color: "oklch(0.85 0.18 85)" }}>
-              {balance !== undefined ? Number(balance).toLocaleString() : "—"}{" "}
-              coins
+              {session ? session.balance.toLocaleString() : "—"} coins
             </span>
           </span>
         </div>
@@ -358,7 +353,7 @@ export default function AviatorGame() {
             type="button"
             data-ocid="aviator.fly.primary_button"
             onClick={handleFly}
-            disabled={gameState === "flying" || !actor || wager < 10}
+            disabled={gameState === "flying" || !session || wager < 10}
             className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
             style={{
               background:
