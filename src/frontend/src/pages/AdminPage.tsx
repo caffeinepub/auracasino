@@ -808,9 +808,17 @@ export default function AdminPage() {
                 </TableHeader>
                 <TableBody>
                   {[
+                    {
+                      name: "✈️ Aviator",
+                      s: (stats as any)
+                        .aviatorStats as typeof stats.rouletteStats,
+                    },
+                    {
+                      name: "🃏 Teen Patti",
+                      s: (stats as any)
+                        .teenPattiStats as typeof stats.rouletteStats,
+                    },
                     { name: "🎲 Roulette", s: stats.rouletteStats },
-                    { name: "🎰 Slots", s: stats.slotsStats },
-                    { name: "🃏 Hi-Lo", s: stats.hiloStats },
                   ].map(({ name, s }) => {
                     const edge =
                       s.totalWagered > 0

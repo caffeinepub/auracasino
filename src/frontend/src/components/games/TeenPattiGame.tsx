@@ -140,25 +140,24 @@ function CardHand({
   handKey: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-2">
       <span
         className="text-xs uppercase tracking-widest font-semibold"
-        style={{ color: "oklch(0.85 0.18 85)" }}
+        style={{ color: "rgba(255,215,0,0.85)" }}
       >
         {label}
       </span>
       <div
         className="flex gap-2 p-3 rounded-xl"
         style={{
-          background: "oklch(0.09 0 0)",
+          background: "rgba(0,0,0,0.25)",
           border:
             win === true
-              ? "2px solid oklch(0.85 0.18 85 / 0.8)"
+              ? "2px solid rgba(255,215,0,0.8)"
               : win === false
-                ? "1px solid oklch(0.62 0.25 25 / 0.4)"
-                : "1px solid oklch(0.62 0.13 78 / 0.2)",
-          boxShadow:
-            win === true ? "0 0 20px oklch(0.85 0.18 85 / 0.2)" : "none",
+                ? "1px solid rgba(220,50,50,0.4)"
+                : "1px solid rgba(255,215,0,0.15)",
+          boxShadow: win === true ? "0 0 20px rgba(255,215,0,0.2)" : "none",
         }}
       >
         {cards.map((c, i) => (
@@ -175,7 +174,7 @@ function CardHand({
       {handRank !== undefined && !faceDown && (
         <span
           className="text-xs font-bold uppercase tracking-wider"
-          style={{ color: win ? "oklch(0.85 0.18 85)" : "oklch(0.65 0 0)" }}
+          style={{ color: win ? "rgba(255,215,0,1)" : "rgba(180,180,180,0.8)" }}
         >
           {HAND_NAMES[handRank] ?? "Unknown"}
         </span>
@@ -225,6 +224,24 @@ export default function TeenPattiGame({
     setGameState("result");
   }
 
+  function handlePack() {
+    if (gameState !== "idle") return;
+    if (!session) {
+      onRequireLogin?.();
+      return;
+    }
+    setResult({
+      win: false,
+      payout: 0n,
+      playerCards: [0n, 1n, 2n],
+      dealerCards: [3n, 4n, 5n],
+      playerRank: 0n,
+      dealerRank: 0n,
+      message: "You packed. Better luck next time!",
+    });
+    setGameState("result");
+  }
+
   function handleAgain() {
     setGameState("idle");
     setResult(null);
@@ -237,21 +254,33 @@ export default function TeenPattiGame({
     <div
       className="rounded-2xl overflow-hidden max-w-2xl mx-auto"
       style={{
-        background: "oklch(0.08 0.02 150)",
-        border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-        boxShadow: "0 0 60px oklch(0 0 0 / 0.5)",
+        background:
+          "linear-gradient(135deg, #1a0a2e 0%, #2d0f4e 50%, #1a0a2e 100%)",
+        border: "1px solid rgba(160,100,220,0.4)",
+        boxShadow:
+          "0 0 60px rgba(100,0,180,0.4), 0 0 120px rgba(100,0,180,0.2)",
       }}
     >
-      <div
-        className="relative px-6 py-8"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, oklch(0.18 0.06 150) 0%, oklch(0.10 0.03 150) 100%)",
-          borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)",
-          minHeight: "260px",
-        }}
-      >
-        <div className="mb-6">
+      {/* Table area */}
+      <div className="relative px-4 py-6" style={{ minHeight: "320px" }}>
+        {/* Green oval table */}
+        <div
+          className="absolute left-1/2 top-1/2"
+          style={{
+            transform: "translate(-50%, -50%)",
+            width: "88%",
+            height: "200px",
+            background:
+              "radial-gradient(ellipse at center, #1a7a1a 0%, #0d5c0d 60%, #094009 100%)",
+            borderRadius: "50%",
+            border: "4px solid rgba(255,215,0,0.6)",
+            boxShadow:
+              "0 0 30px rgba(0,180,0,0.15), inset 0 0 40px rgba(0,0,0,0.4)",
+          }}
+        />
+
+        {/* Dealer hand — top of table */}
+        <div className="relative z-10 mb-4">
           {isResult ? (
             <CardHand
               cards={result.dealerCards.map(Number)}
@@ -271,24 +300,26 @@ export default function TeenPattiGame({
           )}
         </div>
 
-        <div className="flex items-center gap-3 my-4">
+        {/* VS divider */}
+        <div className="relative z-10 flex items-center gap-3 my-2">
           <div
             className="flex-1 h-px"
-            style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
+            style={{ background: "rgba(255,215,0,0.2)" }}
           />
           <span
             className="text-xs uppercase tracking-widest font-bold px-3"
-            style={{ color: "oklch(0.62 0.13 78)" }}
+            style={{ color: "rgba(255,215,0,0.7)" }}
           >
             VS
           </span>
           <div
             className="flex-1 h-px"
-            style={{ background: "oklch(0.62 0.13 78 / 0.2)" }}
+            style={{ background: "rgba(255,215,0,0.2)" }}
           />
         </div>
 
-        <div className="mt-6">
+        {/* Player hand — bottom of table */}
+        <div className="relative z-10 mt-4">
           {isResult ? (
             <CardHand
               cards={result.playerCards.map(Number)}
@@ -308,14 +339,15 @@ export default function TeenPattiGame({
           )}
         </div>
 
+        {/* Dealing overlay */}
         <AnimatePresence>
           {isDealing && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center"
-              style={{ background: "oklch(0.05 0 0 / 0.6)" }}
+              className="absolute inset-0 flex items-center justify-center z-20"
+              style={{ background: "rgba(10,2,20,0.6)" }}
             >
               <motion.div
                 animate={{ rotate: 360 }}
@@ -325,7 +357,7 @@ export default function TeenPattiGame({
                   ease: "linear",
                 }}
                 className="w-10 h-10 rounded-full border-2 border-t-transparent"
-                style={{ borderColor: "oklch(0.85 0.18 85)" }}
+                style={{ borderColor: "rgba(255,215,0,0.9)" }}
                 data-ocid="teen_patti.loading_state"
               />
             </motion.div>
@@ -333,27 +365,25 @@ export default function TeenPattiGame({
         </AnimatePresence>
       </div>
 
+      {/* Result banner */}
       <AnimatePresence>
         {isResult && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-6 py-4 text-center"
+            className="px-6 py-3 text-center"
             style={{
               background: result.win
-                ? "oklch(0.83 0.19 155 / 0.08)"
-                : "oklch(0.62 0.25 25 / 0.08)",
-              borderBottom: `1px solid ${result.win ? "oklch(0.83 0.19 155 / 0.3)" : "oklch(0.62 0.25 25 / 0.3)"}`,
+                ? "rgba(20,100,20,0.25)"
+                : "rgba(120,20,20,0.2)",
+              borderTop: `1px solid ${result.win ? "rgba(50,200,50,0.3)" : "rgba(200,50,50,0.3)"}`,
+              borderBottom: `1px solid ${result.win ? "rgba(50,200,50,0.3)" : "rgba(200,50,50,0.3)"}`,
             }}
           >
             <p
               className="font-bold text-base"
-              style={{
-                color: result.win
-                  ? "oklch(0.83 0.19 155)"
-                  : "oklch(0.72 0.25 25)",
-              }}
+              style={{ color: result.win ? "#4ade80" : "#f87171" }}
               data-ocid={
                 result.win
                   ? "teen_patti.success_state"
@@ -368,13 +398,15 @@ export default function TeenPattiGame({
         )}
       </AnimatePresence>
 
-      <div className="p-6">
-        <div className="flex items-center gap-4 mb-4">
+      {/* Controls */}
+      <div className="p-5">
+        {/* Wager + balance row */}
+        <div className="flex items-center gap-4 mb-5">
           <div className="flex-1">
             <label
               htmlFor="teen-patti-wager"
               className="block text-xs uppercase tracking-wider mb-2"
-              style={{ color: "oklch(0.85 0.18 85)" }}
+              style={{ color: "rgba(255,215,0,0.85)" }}
             >
               Wager
             </label>
@@ -388,50 +420,119 @@ export default function TeenPattiGame({
               disabled={gameState !== "idle"}
               className="w-full px-4 py-2 rounded-lg text-white outline-none"
               style={{
-                border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-                background: "oklch(0.08 0 0)",
+                border: "1px solid rgba(160,100,220,0.5)",
+                background: "rgba(255,255,255,0.07)",
               }}
             />
           </div>
           <div className="pt-6 text-right">
-            <span className="text-xs text-muted-foreground">
+            <span
+              className="text-xs"
+              style={{ color: "rgba(200,180,220,0.7)" }}
+            >
               Balance:{" "}
-              <span style={{ color: "oklch(0.85 0.18 85)" }}>
+              <span style={{ color: "rgba(255,215,0,1)", fontWeight: "bold" }}>
                 {session ? session.balance.toLocaleString() : "—"}
               </span>
             </span>
           </div>
         </div>
 
+        {/* Action buttons */}
         {gameState === "result" ? (
           <button
             type="button"
             data-ocid="teen_patti.deal_again.button"
             onClick={handleAgain}
-            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-opacity hover:opacity-90"
+            className="w-full py-3 rounded-full font-bold uppercase tracking-widest text-sm transition-all hover:scale-105"
             style={{
-              background:
-                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-              color: "oklch(0.07 0 0)",
+              background: "linear-gradient(135deg, #d4a017, #f0c040, #d4a017)",
+              color: "#1a0a2e",
+              boxShadow: "0 4px 20px rgba(212,160,23,0.4)",
             }}
           >
-            🃏 Deal Again
+            🃏 PLAY AGAIN
           </button>
         ) : (
-          <button
-            type="button"
-            data-ocid="teen_patti.deal.primary_button"
-            onClick={handleDeal}
-            disabled={gameState !== "idle" || !session || wager < 10}
-            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-              color: "oklch(0.07 0 0)",
-            }}
-          >
-            {isDealing ? "Dealing Cards…" : "🃏 Deal Cards"}
-          </button>
+          <div className="flex gap-3">
+            {/* PACK */}
+            <button
+              type="button"
+              data-ocid="teen_patti.pack.button"
+              onClick={handlePack}
+              disabled={isDealing}
+              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: isDealing
+                  ? "rgba(180,40,40,0.4)"
+                  : "linear-gradient(135deg, #c0392b, #e74c3c, #c0392b)",
+                color: "#fff",
+                boxShadow: isDealing
+                  ? "none"
+                  : "0 4px 16px rgba(220,50,50,0.4)",
+                border: "1px solid rgba(255,100,100,0.3)",
+              }}
+            >
+              PACK
+            </button>
+
+            {/* BLIND */}
+            <button
+              type="button"
+              data-ocid="teen_patti.blind.button"
+              onClick={handleDeal}
+              disabled={isDealing || wager < 10}
+              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: isDealing
+                  ? "rgba(180,130,0,0.4)"
+                  : "linear-gradient(135deg, #d4a017, #f0c040, #d4a017)",
+                color: "#1a0a2e",
+                boxShadow: isDealing
+                  ? "none"
+                  : "0 4px 16px rgba(212,160,23,0.5)",
+                border: "1px solid rgba(255,215,0,0.4)",
+              }}
+            >
+              {isDealing ? (
+                <span className="flex items-center justify-center gap-1">
+                  <motion.span
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{
+                      repeat: Number.POSITIVE_INFINITY,
+                      duration: 0.8,
+                    }}
+                  >
+                    ⟳
+                  </motion.span>
+                  Dealing…
+                </span>
+              ) : (
+                "BLIND"
+              )}
+            </button>
+
+            {/* SEE */}
+            <button
+              type="button"
+              data-ocid="teen_patti.see.button"
+              onClick={handleDeal}
+              disabled={isDealing || wager < 10}
+              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: isDealing
+                  ? "rgba(20,100,20,0.4)"
+                  : "linear-gradient(135deg, #1a7a1a, #2ecc71, #1a7a1a)",
+                color: "#fff",
+                boxShadow: isDealing
+                  ? "none"
+                  : "0 4px 16px rgba(30,180,80,0.4)",
+                border: "1px solid rgba(50,220,100,0.4)",
+              }}
+            >
+              SEE
+            </button>
+          </div>
         )}
       </div>
     </div>

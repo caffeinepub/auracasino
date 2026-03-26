@@ -140,10 +140,11 @@ export default function Navbar({
                 type="button"
                 data-ocid="nav.logout.button"
                 onClick={onLogout}
-                className="text-muted-foreground hover:text-foreground transition-colors ml-1"
+                className="flex items-center gap-1 ml-1 px-2 py-1 rounded transition-colors text-red-400 hover:text-red-300 hover:bg-red-950/40"
                 title="Logout"
               >
                 <LogOut className="w-3.5 h-3.5" />
+                <span className="text-xs font-semibold">Logout</span>
               </button>
             </div>
           )}
@@ -220,10 +221,10 @@ export default function Navbar({
                 onLogout();
                 setMenuOpen(false);
               }}
-              className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/30 transition-colors py-2.5 rounded-lg"
             >
-              <LogOut className="w-4 h-4" /> Sign Out
-              {shortName ? ` (${shortName})` : ""}
+              <LogOut className="w-4 h-4" />
+              Sign Out{shortName ? ` (${shortName})` : ""}
             </button>
           )}
         </motion.div>

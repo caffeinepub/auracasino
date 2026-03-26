@@ -355,16 +355,35 @@ export default function AviatorGame({
             Fly Again
           </button>
         ) : (
-          <button
+          <motion.button
             type="button"
             data-ocid="aviator.fly.primary_button"
             onClick={handleFly}
-            disabled={gameState === "flying" || !session || wager < 10}
-            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-all disabled:opacity-50"
+            disabled={gameState === "flying" || wager < 10}
+            animate={
+              gameState === "idle"
+                ? {
+                    boxShadow: [
+                      "0 0 20px rgba(212,170,0,0.4)",
+                      "0 0 40px rgba(212,170,0,0.8)",
+                      "0 0 20px rgba(212,170,0,0.4)",
+                    ],
+                  }
+                : {}
+            }
+            transition={{
+              repeat: Number.POSITIVE_INFINITY,
+              duration: 1.6,
+              ease: "easeInOut",
+            }}
+            className="w-full py-5 rounded-xl font-bold uppercase tracking-widest text-lg transition-all disabled:opacity-50"
             style={{
               background:
-                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
+                gameState === "flying"
+                  ? "linear-gradient(135deg, oklch(0.60 0.13 78), oklch(0.50 0.10 78))"
+                  : "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.72 0.16 82), oklch(0.87 0.19 85))",
               color: "oklch(0.07 0 0)",
+              fontSize: "1.15rem",
             }}
           >
             {gameState === "flying" ? (
@@ -381,9 +400,9 @@ export default function AviatorGame({
                 Flying…
               </span>
             ) : (
-              `✈️ Fly & Cash Out at ${targetMultiplier.toFixed(1)}x`
+              "✈️  PLAY NOW"
             )}
-          </button>
+          </motion.button>
         )}
       </div>
     </div>
