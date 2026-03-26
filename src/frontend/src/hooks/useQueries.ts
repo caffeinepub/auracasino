@@ -8,6 +8,7 @@ import type {
 } from "../backend";
 import { usePlayerSession } from "../contexts/PlayerSessionContext";
 import type { UserCredential } from "../declarations/backend.did";
+import { getAnonActor } from "../utils/anonActor";
 import { useActor } from "./useActor";
 
 const RED_NUMBERS = new Set([
@@ -96,27 +97,26 @@ export function useAdminUsers() {
   });
 }
 
+// Use getAnonActor() directly for admin wallet/user queries to avoid useActor null issues
 export function useAdminPlayerWallets() {
-  const { actor, isFetching } = useActor();
   return useQuery<Array<{ username: string; balance: bigint }>>({
     queryKey: ["adminPlayerWallets"],
     queryFn: async () => {
-      if (!actor) throw new Error("No actor");
-      return (actor as any).adminGetPlayerWallets();
+      const actor = await getAnonActor();
+      return actor.adminGetPlayerWallets();
     },
-    enabled: !!actor && !isFetching,
+    refetchInterval: 10000,
   });
 }
 
 export function useAdminCreatedUsers() {
-  const { actor, isFetching } = useActor();
   return useQuery<UserCredential[]>({
     queryKey: ["adminCreatedUsers"],
     queryFn: async () => {
-      if (!actor) throw new Error("No actor");
-      return (actor as any).adminGetUsersWithPasswords();
+      const actor = await getAnonActor();
+      return actor.adminGetUsersWithPasswords();
     },
-    enabled: !!actor && !isFetching,
+    refetchInterval: 10000,
   });
 }
 
@@ -130,17 +130,16 @@ export interface GameRecord {
 }
 
 export function useAdminGameHistory() {
-  const { actor, isFetching } = useActor();
   return useQuery<GameRecord[]>({
     queryKey: ["adminGameHistory"],
     queryFn: async () => {
-      if (!actor) throw new Error("No actor");
-      return (actor as any).adminGetGameHistory();
+      const actor = await getAnonActor();
+      return actor.adminGetGameHistory();
     },
-    enabled: !!actor && !isFetching,
     refetchInterval: 15000,
   });
 }
+
 export function useTopUp() {
   const { actor } = useActor();
   const queryClient = useQueryClient();

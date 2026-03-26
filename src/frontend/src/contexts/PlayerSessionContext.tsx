@@ -24,7 +24,7 @@ const PlayerSessionContext = createContext<PlayerSessionContextType | null>(
   null,
 );
 
-const STORAGE_KEY = "aura_player_session";
+const STORAGE_KEY = "aura_player_session_v2";
 
 export function PlayerSessionProvider({
   children,
@@ -38,7 +38,6 @@ export function PlayerSessionProvider({
       if (raw) {
         try {
           const saved = JSON.parse(raw) as PlayerSession;
-          // Re-validate with backend
           const actor = await getAnonActor();
           const res = await (actor as any).playerLogin(
             saved.username,
@@ -79,13 +78,10 @@ export function PlayerSessionProvider({
 
   if (!initialized) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "oklch(0.07 0 0)" }}
-      >
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div
-          className="w-12 h-12 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "oklch(0.85 0.18 85)" }}
+          className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+          style={{ borderColor: "oklch(0.87 0.15 195)" }}
         />
       </div>
     );

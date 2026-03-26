@@ -1,5 +1,5 @@
 import GameLobby from "../components/GameLobby";
 
 export default function Dashboard() {
-  return <GameLobby />;
+  return <GameLobby onSelectGame={() => {}} />;
 }

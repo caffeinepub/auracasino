@@ -1,8 +1,15 @@
+import { ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { usePlayerSession } from "../../contexts/PlayerSessionContext";
-import { usePlayerPlayTeenPatti } from "../../hooks/useQueries";
+import { getAnonActor } from "../../utils/anonActor";
 
+interface TeenPattiGameProps {
+  onBack: () => void;
+  requireLogin: (onSuccess?: () => void) => void;
+}
+
+const SUITS = ["♠", "♥", "♦", "♣"];
 const RANKS = [
   "A",
   "2",
@@ -18,9 +25,7 @@ const RANKS = [
   "Q",
   "K",
 ];
-const SUITS = ["♠", "♥", "♦", "♣"];
-const SUIT_COLORS = ["#1a1a1a", "#c41e3a", "#c41e3a", "#1a1a1a"];
-const HAND_NAMES = [
+const RANK_NAMES = [
   "High Card",
   "Pair",
   "Color",
@@ -28,511 +33,333 @@ const HAND_NAMES = [
   "Pure Sequence",
   "Trail",
 ];
+const DUMMY_CARDS = ["d0", "d1", "d2"];
 
-function parseCard(cardNum: number) {
+function cardToDisplay(cardNum: number) {
   const rank = RANKS[cardNum % 13];
-  const suitIdx = Math.floor(cardNum / 13);
-  const suit = SUITS[suitIdx];
-  const color = SUIT_COLORS[suitIdx];
-  return { rank, suit, color };
+  const suit = SUITS[Math.floor(cardNum / 13) % 4];
+  const isRed = suit === "♥" || suit === "♦";
+  return { rank, suit, isRed };
 }
 
 function PlayingCard({
   cardNum,
-  faceDown = false,
-  delay = 0,
-  revealed = false,
-  slotKey,
-}: {
-  cardNum?: number;
-  faceDown?: boolean;
-  delay?: number;
-  revealed?: boolean;
-  slotKey: string;
-}) {
-  const card = cardNum !== undefined ? parseCard(cardNum) : null;
-
-  return (
-    <motion.div
-      key={slotKey}
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay, duration: 0.4, ease: "easeOut" }}
-      className="relative rounded-lg overflow-hidden flex-shrink-0"
-      style={{
-        width: "60px",
-        height: "90px",
-        background:
-          faceDown && !revealed
-            ? "oklch(0.15 0.04 240)"
-            : "oklch(0.97 0.01 85)",
-        border:
-          faceDown && !revealed
-            ? "1px solid oklch(0.62 0.13 78 / 0.5)"
-            : "1.5px solid oklch(0.62 0.13 78 / 0.8)",
-        boxShadow: "0 4px 12px oklch(0 0 0 / 0.4)",
-      }}
-    >
-      {faceDown && !revealed ? (
-        <div
-          className="w-full h-full flex items-center justify-center"
-          style={{
-            background:
-              "repeating-linear-gradient(45deg, oklch(0.18 0.04 240) 0px, oklch(0.18 0.04 240) 4px, oklch(0.12 0.03 240) 4px, oklch(0.12 0.03 240) 8px)",
-          }}
-        >
-          <span style={{ fontSize: "24px" }}>🂠</span>
-        </div>
-      ) : card ? (
-        <div className="p-1 w-full h-full flex flex-col justify-between">
-          <div
-            className="text-left"
-            style={{
-              color: card.color,
-              fontSize: "13px",
-              fontWeight: "bold",
-              lineHeight: 1,
-            }}
-          >
-            <div>{card.rank}</div>
-            <div style={{ fontSize: "11px" }}>{card.suit}</div>
-          </div>
-          <div
-            className="text-center"
-            style={{ color: card.color, fontSize: "22px", lineHeight: 1 }}
-          >
-            {card.suit}
-          </div>
-          <div
-            className="text-right"
-            style={{
-              color: card.color,
-              fontSize: "13px",
-              fontWeight: "bold",
-              lineHeight: 1,
-              transform: "rotate(180deg)",
-            }}
-          >
-            <div>{card.rank}</div>
-            <div style={{ fontSize: "11px" }}>{card.suit}</div>
-          </div>
-        </div>
-      ) : null}
-    </motion.div>
-  );
-}
-
-function CardHand({
-  cards,
-  label,
-  handRank,
-  faceDown = false,
-  revealed = false,
-  win,
-  handKey,
-}: {
-  cards: number[];
-  label: string;
-  handRank?: number;
-  faceDown?: boolean;
-  revealed?: boolean;
-  win?: boolean;
-  handKey: string;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <span
-        className="text-xs uppercase tracking-widest font-semibold"
-        style={{ color: "rgba(255,215,0,0.85)" }}
-      >
-        {label}
-      </span>
+  faceDown,
+}: { cardNum: number; faceDown?: boolean }) {
+  if (faceDown) {
+    return (
       <div
-        className="flex gap-2 p-3 rounded-xl"
+        className="w-14 h-20 rounded-lg flex items-center justify-center font-bold text-2xl"
         style={{
-          background: "rgba(0,0,0,0.25)",
-          border:
-            win === true
-              ? "2px solid rgba(255,215,0,0.8)"
-              : win === false
-                ? "1px solid rgba(220,50,50,0.4)"
-                : "1px solid rgba(255,215,0,0.15)",
-          boxShadow: win === true ? "0 0 20px rgba(255,215,0,0.2)" : "none",
+          background:
+            "linear-gradient(135deg, oklch(0.25 0.08 264), oklch(0.35 0.1 295))",
+          border: "1px solid oklch(0.4 0.08 295)",
         }}
       >
-        {cards.map((c, i) => (
-          <PlayingCard
-            key={`${handKey}-card-${c}`}
-            slotKey={`${handKey}-card-${c}`}
-            cardNum={c}
-            faceDown={faceDown}
-            revealed={revealed}
-            delay={i * 0.1}
-          />
-        ))}
+        🂠
       </div>
-      {handRank !== undefined && !faceDown && (
-        <span
-          className="text-xs font-bold uppercase tracking-wider"
-          style={{ color: win ? "rgba(255,215,0,1)" : "rgba(180,180,180,0.8)" }}
-        >
-          {HAND_NAMES[handRank] ?? "Unknown"}
-        </span>
-      )}
+    );
+  }
+  const { rank, suit, isRed } = cardToDisplay(cardNum);
+  return (
+    <div
+      className="w-14 h-20 rounded-lg flex flex-col items-center justify-center font-bold"
+      style={{
+        background: "white",
+        border: "1px solid oklch(0.8 0 0)",
+        color: isRed ? "oklch(0.5 0.25 25)" : "oklch(0.15 0 0)",
+      }}
+    >
+      <span className="text-lg leading-none">{rank}</span>
+      <span className="text-xl leading-none">{suit}</span>
     </div>
   );
 }
 
-interface TeenPattiResult {
-  win: boolean;
-  payout: bigint;
-  playerCards: bigint[];
-  dealerCards: bigint[];
-  playerRank: bigint;
-  dealerRank: bigint;
-  message: string;
-}
-
-type GameState = "idle" | "dealing" | "result";
-
 export default function TeenPattiGame({
-  onRequireLogin,
-}: { onRequireLogin?: () => void }) {
-  const { session } = usePlayerSession();
-  const playTeenPatti = usePlayerPlayTeenPatti();
-
+  onBack,
+  requireLogin,
+}: TeenPattiGameProps) {
+  const { session, updateBalance } = usePlayerSession();
   const [wager, setWager] = useState(100);
-  const [gameState, setGameState] = useState<GameState>("idle");
-  const [result, setResult] = useState<TeenPattiResult | null>(null);
+  const [phase, setPhase] = useState<"betting" | "playing" | "result">(
+    "betting",
+  );
+  const [playerCards, setPlayerCards] = useState<number[]>([]);
+  const [dealerCards, setDealerCards] = useState<number[]>([]);
+  const [showDealer, setShowDealer] = useState(false);
+  const [result, setResult] = useState<{
+    win: boolean;
+    message: string;
+    payout: number;
+    playerRank: number;
+    dealerRank: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const placeholderCards = [0, 1, 2];
-
-  async function handleDeal() {
-    if (gameState !== "idle") return;
-    if (!session) {
-      onRequireLogin?.();
-      return;
-    }
-    setResult(null);
-    setGameState("dealing");
-    try {
-      const res = await playTeenPatti.mutateAsync(wager);
-      setResult(res as TeenPattiResult);
-    } catch (_e) {
-      setResult(null);
-    }
-    setGameState("result");
-  }
-
-  function handlePack() {
-    if (gameState !== "idle") return;
-    if (!session) {
-      onRequireLogin?.();
-      return;
-    }
-    setResult({
-      win: false,
-      payout: 0n,
-      playerCards: [0n, 1n, 2n],
-      dealerCards: [3n, 4n, 5n],
-      playerRank: 0n,
-      dealerRank: 0n,
-      message: "You packed. Better luck next time!",
+  const handleBlind = () => requireLogin(() => doPlay(false));
+  const handleSee = () => requireLogin(() => doPlay(true));
+  const handlePack = () =>
+    requireLogin(() => {
+      setResult({
+        win: false,
+        message: "You packed. Dealer wins.",
+        payout: 0,
+        playerRank: 0,
+        dealerRank: 0,
+      });
+      setPhase("result");
     });
-    setGameState("result");
-  }
 
-  function handleAgain() {
-    setGameState("idle");
+  const doPlay = async (isSee: boolean) => {
+    if (loading || !session) return;
+    const actualWager = isSee ? wager * 2 : wager;
+    if (actualWager > session.balance) return;
+    setLoading(true);
+    setPhase("playing");
+    try {
+      const actor = await getAnonActor();
+      const res = await (actor as any).playerPlayTeenPatti(
+        session.username,
+        session.password,
+        BigInt(actualWager),
+      );
+      const pCards = (res.playerCards as bigint[]).map(Number);
+      const dCards = (res.dealerCards as bigint[]).map(Number);
+      setPlayerCards(pCards);
+      setDealerCards(dCards);
+      setShowDealer(true);
+      const payout = Number(res.payout);
+      updateBalance(session.balance - actualWager + payout);
+      setResult({
+        win: res.win,
+        message: res.message,
+        payout,
+        playerRank: Number(res.playerRank),
+        dealerRank: Number(res.dealerRank),
+      });
+      setPhase("result");
+    } catch {
+      setResult({
+        win: false,
+        message: "Connection error. Try again.",
+        payout: 0,
+        playerRank: 0,
+        dealerRank: 0,
+      });
+      setPhase("result");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => {
+    setPhase("betting");
+    setPlayerCards([]);
+    setDealerCards([]);
+    setShowDealer(false);
     setResult(null);
-  }
-
-  const isDealing = gameState === "dealing";
-  const isResult = gameState === "result" && result !== null;
+  };
 
   return (
     <div
-      className="rounded-2xl overflow-hidden max-w-2xl mx-auto"
+      className="min-h-screen"
       style={{
         background:
-          "linear-gradient(135deg, #1a0a2e 0%, #2d0f4e 50%, #1a0a2e 100%)",
-        border: "1px solid rgba(160,100,220,0.4)",
-        boxShadow:
-          "0 0 60px rgba(100,0,180,0.4), 0 0 120px rgba(100,0,180,0.2)",
+          "linear-gradient(180deg, oklch(0.18 0.06 295) 0%, oklch(0.1 0.03 295) 100%)",
       }}
     >
-      {/* Table area */}
-      <div className="relative px-4 py-6" style={{ minHeight: "320px" }}>
-        {/* Green oval table */}
-        <div
-          className="absolute left-1/2 top-1/2"
-          style={{
-            transform: "translate(-50%, -50%)",
-            width: "88%",
-            height: "200px",
-            background:
-              "radial-gradient(ellipse at center, #1a7a1a 0%, #0d5c0d 60%, #094009 100%)",
-            borderRadius: "50%",
-            border: "4px solid rgba(255,215,0,0.6)",
-            boxShadow:
-              "0 0 30px rgba(0,180,0,0.15), inset 0 0 40px rgba(0,0,0,0.4)",
-          }}
-        />
-
-        {/* Dealer hand — top of table */}
-        <div className="relative z-10 mb-4">
-          {isResult ? (
-            <CardHand
-              cards={result.dealerCards.map(Number)}
-              label="Dealer"
-              handRank={Number(result.dealerRank)}
-              revealed={true}
-              win={!result.win}
-              handKey="dealer-result"
-            />
-          ) : (
-            <CardHand
-              cards={placeholderCards}
-              label="Dealer"
-              faceDown={true}
-              handKey="dealer-idle"
-            />
-          )}
-        </div>
-
-        {/* VS divider */}
-        <div className="relative z-10 flex items-center gap-3 my-2">
-          <div
-            className="flex-1 h-px"
-            style={{ background: "rgba(255,215,0,0.2)" }}
-          />
-          <span
-            className="text-xs uppercase tracking-widest font-bold px-3"
-            style={{ color: "rgba(255,215,0,0.7)" }}
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 rounded-lg transition-colors hover:bg-muted"
+            data-ocid="teenpatti.back_button"
           >
-            VS
-          </span>
-          <div
-            className="flex-1 h-px"
-            style={{ background: "rgba(255,215,0,0.2)" }}
-          />
-        </div>
-
-        {/* Player hand — bottom of table */}
-        <div className="relative z-10 mt-4">
-          {isResult ? (
-            <CardHand
-              cards={result.playerCards.map(Number)}
-              label="Your Hand"
-              handRank={Number(result.playerRank)}
-              revealed={true}
-              win={result.win}
-              handKey="player-result"
-            />
-          ) : (
-            <CardHand
-              cards={placeholderCards}
-              label="Your Hand"
-              faceDown={!isDealing}
-              handKey="player-idle"
-            />
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-extrabold neon-purple">🃏 Teen Patti</h1>
+          {session && (
+            <span
+              className="ml-auto text-sm font-semibold"
+              style={{ color: "oklch(0.87 0.15 195)" }}
+            >
+              💰 {session.balance.toLocaleString()}
+            </span>
           )}
         </div>
-
-        {/* Dealing overlay */}
+        <div
+          className="rounded-3xl p-6 mb-6 relative overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.22 0.08 155), oklch(0.28 0.1 155))",
+            border: "4px solid oklch(0.3 0.08 155)",
+            minHeight: 240,
+          }}
+        >
+          <div
+            className="absolute inset-4 rounded-3xl opacity-20"
+            style={{ border: "2px solid white" }}
+          />
+          <div className="relative">
+            <div className="text-center mb-6">
+              <p className="text-xs text-white/60 mb-2 font-semibold uppercase tracking-wider">
+                Dealer
+              </p>
+              <div className="flex gap-2 justify-center">
+                {dealerCards.length > 0
+                  ? dealerCards.map((c, i) => (
+                      <PlayingCard
+                        key={c + i * 100}
+                        cardNum={c}
+                        faceDown={!showDealer}
+                      />
+                    ))
+                  : DUMMY_CARDS.map((k) => (
+                      <PlayingCard key={k} cardNum={0} faceDown={true} />
+                    ))}
+              </div>
+              {result && (
+                <p className="text-xs text-white/70 mt-1">
+                  {RANK_NAMES[result.dealerRank] || ""}
+                </p>
+              )}
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-white/60 mb-2 font-semibold uppercase tracking-wider">
+                You
+              </p>
+              <div className="flex gap-2 justify-center">
+                {playerCards.length > 0
+                  ? playerCards.map((c, i) => (
+                      <PlayingCard key={c + i * 100 + 1} cardNum={c} />
+                    ))
+                  : DUMMY_CARDS.map((k) => (
+                      <PlayingCard key={k} cardNum={0} faceDown={true} />
+                    ))}
+              </div>
+              {result && (
+                <p className="text-xs text-white/70 mt-1">
+                  {RANK_NAMES[result.playerRank] || ""}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
         <AnimatePresence>
-          {isDealing && (
+          {result && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center z-20"
-              style={{ background: "rgba(10,2,20,0.6)" }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-xl p-4 mb-4 text-center font-bold"
+              style={{
+                background: result.win
+                  ? "oklch(0.82 0.19 155 / 0.15)"
+                  : "oklch(0.62 0.25 25 / 0.15)",
+                border: `1px solid ${result.win ? "oklch(0.82 0.19 155 / 0.4)" : "oklch(0.62 0.25 25 / 0.4)"}`,
+              }}
+              data-ocid={
+                result.win ? "teenpatti.success_state" : "teenpatti.error_state"
+              }
             >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{
-                  repeat: Number.POSITIVE_INFINITY,
-                  duration: 1,
-                  ease: "linear",
-                }}
-                className="w-10 h-10 rounded-full border-2 border-t-transparent"
-                style={{ borderColor: "rgba(255,215,0,0.9)" }}
-                data-ocid="teen_patti.loading_state"
-              />
+              <p
+                className={
+                  result.win ? "win-text text-lg" : "loss-text text-lg"
+                }
+              >
+                {result.win ? `🎉 WIN +${result.payout}` : "❌ LOSE"}
+              </p>
+              <p className="text-sm text-muted-foreground">{result.message}</p>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      {/* Result banner */}
-      <AnimatePresence>
-        {isResult && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-6 py-3 text-center"
+        {phase !== "result" && (
+          <div
+            className="rounded-xl p-5"
             style={{
-              background: result.win
-                ? "rgba(20,100,20,0.25)"
-                : "rgba(120,20,20,0.2)",
-              borderTop: `1px solid ${result.win ? "rgba(50,200,50,0.3)" : "rgba(200,50,50,0.3)"}`,
-              borderBottom: `1px solid ${result.win ? "rgba(50,200,50,0.3)" : "rgba(200,50,50,0.3)"}`,
+              background: "oklch(0.11 0.03 264)",
+              border: "1px solid oklch(0.22 0.04 264)",
             }}
           >
-            <p
-              className="font-bold text-base"
-              style={{ color: result.win ? "#4ade80" : "#f87171" }}
-              data-ocid={
-                result.win
-                  ? "teen_patti.success_state"
-                  : "teen_patti.error_state"
-              }
-            >
-              {result.win
-                ? `🏆 You Win! ${result.message}`
-                : `😔 ${result.message}`}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Controls */}
-      <div className="p-5">
-        {/* Wager + balance row */}
-        <div className="flex items-center gap-4 mb-5">
-          <div className="flex-1">
-            <label
-              htmlFor="teen-patti-wager"
-              className="block text-xs uppercase tracking-wider mb-2"
-              style={{ color: "rgba(255,215,0,0.85)" }}
-            >
-              Wager
-            </label>
-            <input
-              id="teen-patti-wager"
-              data-ocid="teen_patti.wager.input"
-              type="number"
-              min={10}
-              value={wager}
-              onChange={(e) => setWager(Math.max(10, Number(e.target.value)))}
-              disabled={gameState !== "idle"}
-              className="w-full px-4 py-2 rounded-lg text-white outline-none"
-              style={{
-                border: "1px solid rgba(160,100,220,0.5)",
-                background: "rgba(255,255,255,0.07)",
-              }}
-            />
-          </div>
-          <div className="pt-6 text-right">
-            <span
-              className="text-xs"
-              style={{ color: "rgba(200,180,220,0.7)" }}
-            >
-              Balance:{" "}
-              <span style={{ color: "rgba(255,215,0,1)", fontWeight: "bold" }}>
-                {session ? session.balance.toLocaleString() : "—"}
-              </span>
-            </span>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        {gameState === "result" ? (
-          <button
-            type="button"
-            data-ocid="teen_patti.deal_again.button"
-            onClick={handleAgain}
-            className="w-full py-3 rounded-full font-bold uppercase tracking-widest text-sm transition-all hover:scale-105"
-            style={{
-              background: "linear-gradient(135deg, #d4a017, #f0c040, #d4a017)",
-              color: "#1a0a2e",
-              boxShadow: "0 4px 20px rgba(212,160,23,0.4)",
-            }}
-          >
-            🃏 PLAY AGAIN
-          </button>
-        ) : (
-          <div className="flex gap-3">
-            {/* PACK */}
-            <button
-              type="button"
-              data-ocid="teen_patti.pack.button"
-              onClick={handlePack}
-              disabled={isDealing}
-              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: isDealing
-                  ? "rgba(180,40,40,0.4)"
-                  : "linear-gradient(135deg, #c0392b, #e74c3c, #c0392b)",
-                color: "#fff",
-                boxShadow: isDealing
-                  ? "none"
-                  : "0 4px 16px rgba(220,50,50,0.4)",
-                border: "1px solid rgba(255,100,100,0.3)",
-              }}
-            >
-              PACK
-            </button>
-
-            {/* BLIND */}
-            <button
-              type="button"
-              data-ocid="teen_patti.blind.button"
-              onClick={handleDeal}
-              disabled={isDealing || wager < 10}
-              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: isDealing
-                  ? "rgba(180,130,0,0.4)"
-                  : "linear-gradient(135deg, #d4a017, #f0c040, #d4a017)",
-                color: "#1a0a2e",
-                boxShadow: isDealing
-                  ? "none"
-                  : "0 4px 16px rgba(212,160,23,0.5)",
-                border: "1px solid rgba(255,215,0,0.4)",
-              }}
-            >
-              {isDealing ? (
-                <span className="flex items-center justify-center gap-1">
-                  <motion.span
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{
-                      repeat: Number.POSITIVE_INFINITY,
-                      duration: 0.8,
+            <div className="mb-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                Blind Bet
+              </p>
+              <div className="flex gap-2">
+                {[50, 100, 200, 500].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setWager(v)}
+                    className="flex-1 py-2 rounded-lg text-sm font-bold transition-all"
+                    style={{
+                      background:
+                        wager === v
+                          ? "oklch(0.72 0.22 295 / 0.3)"
+                          : "oklch(0.16 0.03 264)",
+                      color:
+                        wager === v
+                          ? "oklch(0.72 0.22 295)"
+                          : "oklch(0.6 0.03 264)",
+                      border: `1px solid ${wager === v ? "oklch(0.72 0.22 295 / 0.5)" : "oklch(0.22 0.04 264)"}`,
                     }}
                   >
-                    ⟳
-                  </motion.span>
-                  Dealing…
-                </span>
-              ) : (
-                "BLIND"
-              )}
-            </button>
-
-            {/* SEE */}
-            <button
-              type="button"
-              data-ocid="teen_patti.see.button"
-              onClick={handleDeal}
-              disabled={isDealing || wager < 10}
-              className="flex-1 py-3 rounded-full font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: isDealing
-                  ? "rgba(20,100,20,0.4)"
-                  : "linear-gradient(135deg, #1a7a1a, #2ecc71, #1a7a1a)",
-                color: "#fff",
-                boxShadow: isDealing
-                  ? "none"
-                  : "0 4px 16px rgba(30,180,80,0.4)",
-                border: "1px solid rgba(50,220,100,0.4)",
-              }}
-            >
-              SEE
-            </button>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={handlePack}
+                disabled={loading}
+                className="py-3 rounded-xl font-extrabold text-sm transition-all"
+                style={{
+                  background: "oklch(0.62 0.25 25 / 0.2)",
+                  color: "oklch(0.75 0.2 25)",
+                  border: "1px solid oklch(0.62 0.25 25 / 0.4)",
+                }}
+                data-ocid="teenpatti.secondary_button"
+              >
+                PACK
+              </button>
+              <button
+                type="button"
+                onClick={handleBlind}
+                disabled={loading}
+                className="py-3 rounded-xl font-extrabold text-sm btn-neon-cyan transition-all disabled:opacity-50"
+                data-ocid="teenpatti.primary_button"
+              >
+                BLIND ({wager})
+              </button>
+              <button
+                type="button"
+                onClick={handleSee}
+                disabled={loading}
+                className="py-3 rounded-xl font-extrabold text-sm transition-all"
+                style={{
+                  background: "oklch(0.72 0.22 295 / 0.2)",
+                  color: "oklch(0.72 0.22 295)",
+                  border: "1px solid oklch(0.72 0.22 295 / 0.4)",
+                }}
+                data-ocid="teenpatti.secondary_button"
+              >
+                SEE ({wager * 2})
+              </button>
+            </div>
           </div>
+        )}
+        {phase === "result" && (
+          <button
+            type="button"
+            onClick={reset}
+            className="w-full py-4 rounded-xl font-extrabold text-lg btn-neon-cyan transition-all"
+            data-ocid="teenpatti.secondary_button"
+          >
+            Play Again
+          </button>
         )}
       </div>
     </div>

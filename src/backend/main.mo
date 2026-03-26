@@ -125,12 +125,33 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Admin-created user credentials: username -> password
+  // ─── Stable backing storage (survives upgrades) ───────────────────────────
+  stable var stableCreatedUsers : [(Text, Text)] = [];
+  stable var stablePlayerWallets : [(Text, Nat)] = [];
+  stable var stableGameHistory : [GameRecord] = [];
+
+  // ─── Runtime mutable maps ─────────────────────────────────────────────────
   let createdUsers = Map.empty<Text, Text>();
-  // Player wallets keyed by username
   let playerWallets = Map.empty<Text, Nat>();
-  // Game history (last 500 records)
   var gameHistory : [GameRecord] = [];
+
+  // Restore from stable storage on upgrade
+  system func postupgrade() {
+    for ((k, v) in stableCreatedUsers.vals()) {
+      createdUsers.add(k, v);
+    };
+    for ((k, v) in stablePlayerWallets.vals()) {
+      playerWallets.add(k, v);
+    };
+    gameHistory := stableGameHistory;
+  };
+
+  // Save to stable storage before upgrade
+  system func preupgrade() {
+    stableCreatedUsers := createdUsers.toArray();
+    stablePlayerWallets := playerWallets.toArray();
+    stableGameHistory := gameHistory;
+  };
 
   let initialBalance = 1000;
   // II-based wallets (legacy)
@@ -173,7 +194,6 @@ actor {
     { totalWagered = stats.totalWagered + wager; totalPaidOut = stats.totalPaidOut + payout; playCount = stats.playCount + 1 };
   };
 
-  // Validate player credentials, return (isValid, balance)
   func validatePlayer(username : Text, password : Text) : (Bool, Nat) {
     switch (createdUsers.get(username)) {
       case (null) { (false, 0) };
@@ -303,7 +323,6 @@ actor {
     { win; payout; playerCards = [p1, p2, p3]; dealerCards = [d1, d2, d3]; playerRank; dealerRank; message = msg };
   };
 
-  // Admin wallet control - no principal auth (protected by frontend password)
   public query func adminGetPlayerWallets() : async [PlayerWallet] {
     let usersArray = createdUsers.toArray();
     usersArray.map(func((username, _)) : PlayerWallet {
@@ -329,8 +348,10 @@ actor {
     "Balance updated: " # username # " now has " # newBalance.toText() # " coins";
   };
 
-  // Admin creates a player account - no principal auth (protected by frontend password)
+  // Admin creates a player account
   public shared func adminCreateUser(username : Text, password : Text) : async Text {
+    if (username.size() == 0) { return "Username cannot be empty" };
+    if (password.size() == 0) { return "Password cannot be empty" };
     if (createdUsers.containsKey(username)) { return "Username already exists" };
     createdUsers.add(username, password);
     playerWallets.add(username, initialBalance);
@@ -343,12 +364,10 @@ actor {
     sortedUsers.map(func((username, _)) { username });
   };
 
-  // Admin get game history - no principal auth (protected by frontend password)
   public query func adminGetGameHistory() : async [GameRecord] {
     gameHistory;
   };
 
-  // Force claim admin using the admin token
   public shared ({ caller }) func forceClaimAdmin(secret : Text) : async Text {
     switch (Prim.envVar<system>("CAFFEINE_ADMIN_TOKEN")) {
       case (null) { Runtime.trap("Admin token not configured") };
@@ -603,7 +622,6 @@ actor {
       rouletteStats; slotsStats; hiloStats; aviatorStats; teenPattiStats };
   };
 
-  // Admin get all created users with credentials - protected by frontend password
   public query func adminGetUsersWithPasswords() : async [UserCredential] {
     let usersArray = createdUsers.toArray();
     usersArray.map(func((username, password)) : UserCredential {

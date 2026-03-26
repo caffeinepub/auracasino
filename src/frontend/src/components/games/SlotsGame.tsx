@@ -1,263 +1,255 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import type { SlotsResult } from "../../backend.d";
-import { usePlaySlots } from "../../hooks/useQueries";
+import { useRef, useState } from "react";
+import { usePlayerSession } from "../../contexts/PlayerSessionContext";
 
-const SYMBOLS = ["🍒", "🍋", "🍊", "🍇", "🎰", "⭐", "💎"];
-const PAYOUTS: Record<string, string> = {
-  "💎": "50x",
-  "⭐": "20x",
-  "🎰": "10x",
-  "🍒": "5x",
-  "🍇": "4x",
-  "🍊": "3x",
-  "🍋": "2x",
+interface SlotsGameProps {
+  onBack: () => void;
+  requireLogin: (onSuccess?: () => void) => void;
+}
+
+const SYMBOLS = ["🍒", "🔔", "💎", "7️⃣", "⭐", "🍋"];
+const SYMBOL_PAYOUTS: Record<string, number> = {
+  "🍒": 10,
+  "🔔": 15,
+  "💎": 30,
+  "7️⃣": 50,
+  "⭐": 20,
+  "🍋": 8,
 };
 
-interface ReelProps {
-  finalSymbol: string;
-  spinning: boolean;
-  delay: number;
+function getRandomSymbol() {
+  return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
 }
 
-function Reel({ finalSymbol, spinning, delay }: ReelProps) {
-  const [displaySymbol, setDisplaySymbol] = useState("🎰");
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (spinning) {
-      setDisplaySymbol(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
-      intervalRef.current = setInterval(() => {
-        setDisplaySymbol(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
-      }, 80);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      const timeout = setTimeout(() => setDisplaySymbol(finalSymbol), delay);
-      return () => clearTimeout(timeout);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [spinning, finalSymbol, delay]);
-
-  return (
-    <div
-      className="flex items-center justify-center text-4xl select-none rounded-xl"
-      style={{
-        width: "80px",
-        height: "90px",
-        background: spinning ? "oklch(0.10 0 0)" : "oklch(0.14 0 0)",
-        border: "2px solid oklch(0.62 0.13 78 / 0.4)",
-        boxShadow: spinning
-          ? "0 0 20px oklch(0.85 0.18 85 / 0.15)"
-          : "inset 0 2px 4px oklch(0 0 0 / 0.5)",
-        transition: "all 0.3s",
-      }}
-    >
-      <span
-        style={{
-          filter: spinning ? "blur(1px)" : "none",
-          transition: "filter 0.3s",
-        }}
-      >
-        {displaySymbol}
-      </span>
-    </div>
-  );
+function calcPayout(reels: string[], wager: number): number {
+  if (reels[0] === reels[1] && reels[1] === reels[2])
+    return wager * SYMBOL_PAYOUTS[reels[0]];
+  if (reels[0] === reels[1] || reels[1] === reels[2] || reels[0] === reels[2])
+    return Math.floor(wager * 1.5);
+  return 0;
 }
 
-export default function SlotsGame() {
-  const [wager, setWager] = useState("10");
+const SPIN_DURATION = 1400;
+
+export default function SlotsGame({ onBack, requireLogin }: SlotsGameProps) {
+  const { session, updateBalance } = usePlayerSession();
+  const [wager, setWager] = useState(50);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<SlotsResult | null>(null);
-  const [reel0, setReel0] = useState("🎰");
-  const [reel1, setReel1] = useState("🎰");
-  const [reel2, setReel2] = useState("🎰");
-  const playSlots = usePlaySlots();
+  const [reels, setReels] = useState(["🍒", "💎", "⭐"]);
+  const [result, setResult] = useState<{
+    win: boolean;
+    payout: number;
+    message: string;
+  } | null>(null);
+  const [spinningReels, setSpinningReels] = useState([false, false, false]);
+  const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  async function handleSpin() {
-    const wagerNum = Number.parseInt(wager);
-    if (!wagerNum || wagerNum < 1) {
-      toast.error("Enter a valid wager");
-      return;
-    }
+  const handleSpin = () => requireLogin(() => doSpin());
+
+  const doSpin = () => {
+    if (spinning || !session || wager > session.balance) return;
+    for (const t of timeouts.current) clearTimeout(t);
+    timeouts.current = [];
     setSpinning(true);
     setResult(null);
-    try {
-      const res = await playSlots.mutateAsync(wagerNum);
-      const s0 = SYMBOLS[Number(res.reels[0])] ?? "🎰";
-      const s1 = SYMBOLS[Number(res.reels[1])] ?? "🎰";
-      const s2 = SYMBOLS[Number(res.reels[2])] ?? "🎰";
-      setTimeout(() => {
-        setSpinning(false);
-        setReel0(s0);
-        setReel1(s1);
-        setReel2(s2);
-        setTimeout(() => {
-          setResult(res);
-          if (res.win) {
-            toast.success(`🎰 JACKPOT! +${Number(res.payout)} coins!`);
-          } else {
-            toast.error("No match. Spin again!");
+    setSpinningReels([true, true, true]);
+    const finalReels = [
+      getRandomSymbol(),
+      getRandomSymbol(),
+      getRandomSymbol(),
+    ];
+    for (const i of [0, 1, 2]) {
+      const t = setTimeout(
+        () => {
+          setReels((prev) => {
+            const next = [...prev];
+            next[i] = finalReels[i];
+            return next;
+          });
+          setSpinningReels((prev) => {
+            const next = [...prev];
+            next[i] = false;
+            return next;
+          });
+          if (i === 2) {
+            const payout = calcPayout(finalReels, wager);
+            const win = payout > 0;
+            updateBalance(session.balance - wager + payout);
+            setResult({
+              win,
+              payout,
+              message: win
+                ? payout >= wager * 10
+                  ? "JACKPOT! 🎉"
+                  : "Winner!"
+                : "Try again!",
+            });
+            setSpinning(false);
           }
-        }, 400);
-      }, 2000);
-    } catch (e: any) {
-      setSpinning(false);
-      toast.error(e?.message ?? "Spin failed");
+        },
+        SPIN_DURATION + i * 300,
+      );
+      timeouts.current.push(t);
     }
-  }
+  };
 
   return (
     <div
-      className="rounded-2xl overflow-hidden flex flex-col card-glow card-glow-hover transition-all duration-300"
+      className="min-h-screen"
       style={{
-        background: "oklch(0.12 0 0)",
-        border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-        minHeight: "520px",
+        background:
+          "linear-gradient(180deg, oklch(0.08 0.025 264) 0%, oklch(0.06 0.02 264) 100%)",
       }}
     >
-      <div
-        className="px-5 py-4"
-        style={{ borderBottom: "1px solid oklch(0.62 0.13 78 / 0.2)" }}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl font-bold uppercase tracking-widest gold-gradient-text">
-            Slots
-          </h3>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
-            Up to 50x
-          </span>
+      <div className="max-w-lg mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 rounded-lg transition-colors hover:bg-muted"
+            data-ocid="slots.back_button"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-extrabold neon-purple">🎰 Slots</h1>
+          {session && (
+            <span
+              className="ml-auto text-sm font-semibold"
+              style={{ color: "oklch(0.87 0.15 195)" }}
+            >
+              💰 {session.balance.toLocaleString()}
+            </span>
+          )}
         </div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center px-5 py-6 gap-5">
         <div
-          className="rounded-2xl p-4 w-full"
+          className="rounded-2xl p-6 mb-4 text-center"
           style={{
-            background: "oklch(0.09 0 0)",
-            border: "2px solid oklch(0.62 0.13 78 / 0.3)",
-            boxShadow: "inset 0 4px 12px oklch(0 0 0 / 0.4)",
+            background: "oklch(0.11 0.03 264)",
+            border: "1px solid oklch(0.72 0.22 295 / 0.4)",
+            boxShadow: "0 0 40px oklch(0.72 0.22 295 / 0.15)",
           }}
         >
-          <div className="flex justify-center mb-3">
-            <div
-              className="h-0.5 w-full rounded"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, oklch(0.85 0.18 85 / 0.5), transparent)",
-              }}
-            />
+          <div className="flex gap-3 justify-center mb-6">
+            {(["reel-0", "reel-1", "reel-2"] as const).map((rid, i) => (
+              <div
+                key={rid}
+                className="w-24 h-24 rounded-xl flex items-center justify-center text-5xl"
+                style={{
+                  background: "oklch(0.15 0.04 264)",
+                  border: "2px solid oklch(0.72 0.22 295 / 0.4)",
+                  boxShadow: spinningReels[i]
+                    ? "0 0 20px oklch(0.72 0.22 295 / 0.5)"
+                    : "none",
+                }}
+                data-ocid="slots.canvas_target"
+              >
+                {spinningReels[i]
+                  ? SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]
+                  : reels[i]}
+              </div>
+            ))}
           </div>
-          <div className="flex justify-center gap-2">
-            <Reel finalSymbol={reel0} spinning={spinning} delay={0} />
-            <Reel finalSymbol={reel1} spinning={spinning} delay={250} />
-            <Reel finalSymbol={reel2} spinning={spinning} delay={500} />
+          <div className="text-xs text-muted-foreground mb-2">
+            3 Match:{" "}
+            {Object.entries(SYMBOL_PAYOUTS)
+              .map(([s, p]) => `${s}=${p}x`)
+              .join(" ")}
           </div>
-          <div className="flex justify-center mt-3">
-            <div
-              className="h-0.5 w-full rounded"
-              style={{
-                background:
-                  "linear-gradient(90deg, transparent, oklch(0.85 0.18 85 / 0.5), transparent)",
-              }}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">2 Match = 1.5x wager</p>
         </div>
-
         <AnimatePresence>
           {result && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="text-center"
+              className="rounded-xl p-4 mb-4 text-center font-bold"
+              style={{
+                background: result.win
+                  ? "oklch(0.82 0.19 155 / 0.15)"
+                  : "oklch(0.62 0.25 25 / 0.15)",
+                border: `1px solid ${result.win ? "oklch(0.82 0.19 155 / 0.4)" : "oklch(0.62 0.25 25 / 0.4)"}`,
+              }}
+              data-ocid={
+                result.win ? "slots.success_state" : "slots.error_state"
+              }
             >
               <p
-                className={`text-lg font-bold ${result.win ? "win-glow" : "loss-glow"}`}
+                className={
+                  result.win ? "win-text text-xl" : "loss-text text-xl"
+                }
               >
-                {result.win
-                  ? `🎉 +${Number(result.payout)} coins!`
-                  : "💸 No match"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
                 {result.message}
               </p>
+              {result.win && (
+                <p
+                  className="text-sm"
+                  style={{ color: "oklch(0.87 0.15 195)" }}
+                >
+                  +{result.payout} coins
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div className="w-full grid grid-cols-4 gap-1">
-          {Object.entries(PAYOUTS).map(([sym, payout]) => (
-            <div
-              key={sym}
-              className="text-center py-1 px-2 rounded-lg"
-              style={{
-                background: "oklch(0.10 0 0)",
-                border: "1px solid oklch(0.62 0.13 78 / 0.15)",
-              }}
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "oklch(0.11 0.03 264)",
+            border: "1px solid oklch(0.22 0.04 264)",
+          }}
+        >
+          <div className="mb-4">
+            <label
+              htmlFor="slots-wager"
+              className="text-xs text-muted-foreground uppercase tracking-wider block mb-2"
             >
-              <div className="text-lg">{sym}</div>
-              <div
-                className="text-[10px] font-bold"
-                style={{ color: "oklch(0.85 0.18 85)" }}
-              >
-                {payout}
-              </div>
+              Bet Amount
+            </label>
+            <div className="flex gap-2">
+              {[25, 50, 100, 250].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setWager(v)}
+                  className="flex-1 py-2 rounded-lg text-sm font-bold transition-all"
+                  style={{
+                    background:
+                      wager === v
+                        ? "oklch(0.72 0.22 295 / 0.3)"
+                        : "oklch(0.16 0.03 264)",
+                    color:
+                      wager === v
+                        ? "oklch(0.72 0.22 295)"
+                        : "oklch(0.6 0.03 264)",
+                    border: `1px solid ${wager === v ? "oklch(0.72 0.22 295 / 0.5)" : "oklch(0.22 0.04 264)"}`,
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-
-        <div className="w-full">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
-                Wager
-              </p>
-              <Input
-                data-ocid="slots.wager.input"
-                type="number"
-                min={1}
-                value={wager}
-                onChange={(e) => setWager(e.target.value)}
-                placeholder="Coins..."
-                style={{
-                  background: "oklch(0.17 0 0)",
-                  border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-                  color: "oklch(0.97 0 0)",
-                }}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                data-ocid="slots.spin.primary_button"
-                onClick={handleSpin}
-                disabled={spinning || playSlots.isPending}
-                className="font-bold uppercase tracking-wider transition-all hover:scale-105"
-                style={{
-                  background: spinning
-                    ? "oklch(0.17 0 0)"
-                    : "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-                  color: spinning ? "oklch(0.55 0 0)" : "oklch(0.07 0 0)",
-                  border: "none",
-                  minWidth: "80px",
-                }}
-              >
-                {spinning ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "SPIN"
-                )}
-              </Button>
-            </div>
+            <input id="slots-wager" type="hidden" value={wager} readOnly />
           </div>
+          <button
+            type="button"
+            onClick={handleSpin}
+            disabled={spinning}
+            className="w-full py-4 rounded-xl font-extrabold text-xl transition-all disabled:opacity-50"
+            style={{
+              background: spinning
+                ? "oklch(0.2 0.04 264)"
+                : "linear-gradient(135deg, oklch(0.72 0.22 295), oklch(0.6 0.2 295))",
+              color: "white",
+              boxShadow: spinning
+                ? "none"
+                : "0 0 25px oklch(0.72 0.22 295 / 0.5)",
+            }}
+            data-ocid="slots.primary_button"
+          >
+            {spinning ? "Spinning..." : "🎰 SPIN"}
+          </button>
         </div>
       </div>
     </div>

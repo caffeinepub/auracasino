@@ -1,409 +1,284 @@
+import { ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { usePlayerSession } from "../../contexts/PlayerSessionContext";
-import { usePlayerPlayAviator } from "../../hooks/useQueries";
+import { getAnonActor } from "../../utils/anonActor";
 
-type GameState = "idle" | "flying" | "result";
-
-interface AviatorResult {
-  win: boolean;
-  payout: bigint;
-  crashPoint: bigint;
-  message: string;
+interface AviatorGameProps {
+  onBack: () => void;
+  requireLogin: (onSuccess?: () => void) => void;
 }
 
-const STAR_POSITIONS = [
-  { x: 40, y: 18 },
-  { x: 80, y: 33 },
-  { x: 130, y: 10 },
-  { x: 200, y: 56 },
-  { x: 270, y: 10 },
-  { x: 320, y: 33 },
-  { x: 370, y: 18 },
-  { x: 60, y: 56 },
-  { x: 180, y: 33 },
-  { x: 290, y: 56 },
-];
+type GamePhase = "waiting" | "flying" | "cashed" | "crashed";
 
 export default function AviatorGame({
-  onRequireLogin,
-}: { onRequireLogin?: () => void }) {
-  const { session } = usePlayerSession();
-  const playAviator = usePlayerPlayAviator();
-
-  const [wager, setWager] = useState(100);
-  const [targetMultiplier, setTargetMultiplier] = useState(2.0);
-  const [gameState, setGameState] = useState<GameState>("idle");
-  const [displayMultiplier, setDisplayMultiplier] = useState(1.0);
-  const [result, setResult] = useState<AviatorResult | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
+  onBack,
+  requireLogin,
+}: AviatorGameProps) {
+  const { session, updateBalance } = usePlayerSession();
+  const [wager, setWager] = useState("100");
+  const [targetMultiplier, setTargetMultiplier] = useState("2.00");
+  const [phase, setPhase] = useState<GamePhase>("waiting");
+  const [multiplier, setMultiplier] = useState(1.0);
+  const [result, setResult] = useState<{
+    win: boolean;
+    message: string;
+    payout: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (gameState !== "flying") {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      return;
-    }
-    startTimeRef.current = performance.now();
-    const animate = (now: number) => {
-      const elapsed = (now - startTimeRef.current) / 1000;
-      const newVal = 1.0 + elapsed * elapsed * 0.8;
-      setDisplayMultiplier(Math.min(newVal, targetMultiplier + 1));
-      animFrameRef.current = requestAnimationFrame(animate);
-    };
-    animFrameRef.current = requestAnimationFrame(animate);
     return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [gameState, targetMultiplier]);
+  }, []);
 
-  async function handleFly() {
-    if (gameState !== "idle") return;
-    if (!session) {
-      onRequireLogin?.();
-      return;
-    }
+  const handleBet = () => requireLogin(() => doFly());
+
+  const doFly = async () => {
+    if (loading || !session) return;
+    const wagerNum = Number(wager);
+    if (wagerNum <= 0 || wagerNum > session.balance) return;
+    const targetNum = Math.round(Number(targetMultiplier) * 100);
+    setLoading(true);
     setResult(null);
-    setDisplayMultiplier(1.0);
-    setGameState("flying");
-    await new Promise((r) => setTimeout(r, 2200));
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    setPhase("flying");
+    setMultiplier(1.0);
+    let current = 1.0;
+    intervalRef.current = setInterval(() => {
+      current += 0.05;
+      setMultiplier(Number.parseFloat(current.toFixed(2)));
+    }, 80);
     try {
-      const res = await playAviator.mutateAsync({
-        wager,
-        targetMultiplierX100: Math.round(targetMultiplier * 100),
+      const actor = await getAnonActor();
+      const res = await (actor as any).playerPlayAviator(
+        session.username,
+        session.password,
+        BigInt(wagerNum),
+        BigInt(targetNum),
+      );
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      const crashPoint = Number(res.crashPoint) / 100;
+      setMultiplier(crashPoint);
+      if (res.win) {
+        setPhase("cashed");
+        const payout = Number(res.payout);
+        updateBalance(session.balance - wagerNum + payout);
+        setResult({ win: true, message: res.message, payout });
+      } else {
+        setPhase("crashed");
+        updateBalance(session.balance - wagerNum);
+        setResult({ win: false, message: res.message, payout: 0 });
+      }
+    } catch {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setPhase("crashed");
+      setResult({
+        win: false,
+        message: "Connection error. Try again.",
+        payout: 0,
       });
-      setResult(res as AviatorResult);
-      setDisplayMultiplier(Number(res.crashPoint) / 100);
-    } catch (_e) {
-      setResult(null);
+    } finally {
+      setLoading(false);
     }
-    setGameState("result");
-  }
+  };
 
-  function handlePlayAgain() {
-    setGameState("idle");
+  const reset = () => {
+    setPhase("waiting");
+    setMultiplier(1.0);
     setResult(null);
-    setDisplayMultiplier(1.0);
-  }
-
-  const planeX = gameState === "flying" ? 78 : gameState === "result" ? 82 : 15;
-  const planeY = gameState === "flying" ? 18 : gameState === "result" ? 22 : 75;
+  };
 
   return (
     <div
-      className="rounded-2xl overflow-hidden max-w-2xl mx-auto"
+      className="min-h-screen"
       style={{
-        background: "oklch(0.08 0.02 240)",
-        border: "1px solid oklch(0.62 0.13 78 / 0.3)",
-        boxShadow: "0 0 60px oklch(0 0 0 / 0.5)",
+        background:
+          "linear-gradient(180deg, oklch(0.08 0.025 264) 0%, oklch(0.06 0.02 264) 100%)",
       }}
     >
-      <div
-        className="relative w-full"
-        style={{ height: "260px", background: "oklch(0.06 0.03 240)" }}
-      >
-        <svg
-          viewBox="0 0 400 260"
-          className="w-full h-full"
-          aria-label="Aviator game canvas"
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 rounded-lg transition-colors hover:bg-muted"
+            data-ocid="aviator.back_button"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-extrabold neon-cyan">✈️ Aviator</h1>
+          {session && (
+            <span
+              className="ml-auto text-sm font-semibold"
+              style={{ color: "oklch(0.87 0.15 195)" }}
+            >
+              💰 {session.balance.toLocaleString()}
+            </span>
+          )}
+        </div>
+        <div
+          className="rounded-2xl p-8 mb-6 text-center relative overflow-hidden"
+          style={{
+            background: "oklch(0.11 0.03 264)",
+            border: "1px solid oklch(0.25 0.05 264)",
+            minHeight: "200px",
+          }}
         >
-          <title>Aviator</title>
-          <defs>
-            <radialGradient id="sky" cx="50%" cy="100%" r="80%">
-              <stop offset="0%" stopColor="oklch(0.12 0.05 240)" />
-              <stop offset="100%" stopColor="oklch(0.05 0.02 240)" />
-            </radialGradient>
-            <linearGradient id="curve-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="oklch(0.85 0.18 85 / 0.2)" />
-              <stop offset="100%" stopColor="oklch(0.85 0.18 85)" />
-            </linearGradient>
-            <linearGradient id="plane-gold" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="oklch(0.62 0.13 78)" />
-              <stop offset="100%" stopColor="oklch(0.90 0.19 85)" />
-            </linearGradient>
-            <filter id="glow-filter">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-          <rect width="400" height="260" fill="url(#sky)" />
-          {STAR_POSITIONS.map((s) => (
-            <circle
-              key={`star-${s.x}-${s.y}`}
-              cx={s.x}
-              cy={s.y}
-              r="1"
-              fill="white"
-              opacity="0.5"
-            />
-          ))}
-          <line
-            x1="20"
-            y1="240"
-            x2="380"
-            y2="240"
-            stroke="oklch(0.85 0.18 85 / 0.12)"
-            strokeWidth="1"
-          />
-          <line
-            x1="20"
-            y1="240"
-            x2="20"
-            y2="10"
-            stroke="oklch(0.85 0.18 85 / 0.12)"
-            strokeWidth="1"
-          />
-          <line
-            x1="20"
-            y1="185"
-            x2="380"
-            y2="185"
-            stroke="oklch(0.85 0.18 85 / 0.06)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1="20"
-            y1="130"
-            x2="380"
-            y2="130"
-            stroke="oklch(0.85 0.18 85 / 0.06)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-          <line
-            x1="20"
-            y1="75"
-            x2="380"
-            y2="75"
-            stroke="oklch(0.85 0.18 85 / 0.06)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-          <path
-            d="M20,230 Q100,220 180,180 Q260,130 360,30 L380,240 L20,240 Z"
-            fill="oklch(0.85 0.18 85 / 0.05)"
-          />
-          <path
-            d="M20,230 Q100,220 180,180 Q260,130 360,30"
-            fill="none"
-            stroke="url(#curve-grad)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M20,230 Q100,220 180,180 Q260,130 360,30"
-            fill="none"
-            stroke="oklch(0.85 0.18 85 / 0.25)"
-            strokeWidth="6"
-            filter="url(#glow-filter)"
-          />
-          <motion.g
-            animate={{ x: planeX * 4, y: planeY * 2.6 }}
-            transition={{
-              duration: gameState === "flying" ? 2.2 : 0.3,
-              ease: "easeInOut",
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, oklch(0.87 0.15 195) 0%, transparent 70%)",
             }}
-          >
-            <g transform="rotate(-30, 0, 0)">
-              <ellipse cx="0" cy="0" rx="18" ry="6" fill="url(#plane-gold)" />
-              <ellipse
-                cx="12"
-                cy="-2"
-                rx="7"
-                ry="4"
-                fill="oklch(0.92 0.15 85)"
-              />
-              <polygon
-                points="-4,-7 -14,-20 -20,-7"
-                fill="oklch(0.78 0.16 82)"
-              />
-              <polygon points="-4,7 -14,20 -20,7" fill="oklch(0.78 0.16 82)" />
-              <polygon
-                points="-16,-3 -24,-12 -18,-3"
-                fill="oklch(0.62 0.13 78)"
-              />
-            </g>
-          </motion.g>
-          <text
-            x="30"
-            y="50"
-            fontFamily="monospace"
-            fontSize="36"
-            fontWeight="bold"
-            fill={
-              result?.win
-                ? "oklch(0.83 0.19 155)"
-                : result
-                  ? "oklch(0.72 0.25 25)"
-                  : "oklch(0.87 0.19 85)"
-            }
-            opacity="0.95"
-          >
-            {displayMultiplier.toFixed(2)}x
-          </text>
-        </svg>
-      </div>
-
-      <div className="p-6">
-        <AnimatePresence mode="wait">
-          {gameState === "result" && result && (
+          />
+          <div className="relative">
+            {phase === "flying" && (
+              <div className="text-7xl font-black mb-2 neon-green animate-multiplier-rise">
+                {multiplier.toFixed(2)}x
+              </div>
+            )}
+            {phase === "cashed" && (
+              <div className="text-7xl font-black mb-2 win-text animate-multiplier-rise">
+                {multiplier.toFixed(2)}x
+              </div>
+            )}
+            {phase === "crashed" && (
+              <div
+                className="text-7xl font-black mb-2 animate-crash-shake"
+                style={{ color: "oklch(0.65 0.25 25)" }}
+              >
+                {multiplier.toFixed(2)}x
+              </div>
+            )}
+            {phase === "waiting" && (
+              <div
+                className="text-5xl font-black mb-2"
+                style={{ color: "oklch(0.5 0.03 264)" }}
+              >
+                —
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              {phase === "waiting" && "Place your bet and fly!"}
+              {phase === "flying" && "🛫 Flying..."}
+              {phase === "cashed" && "🎉 Cashed out!"}
+              {phase === "crashed" && "💥 Crashed!"}
+            </p>
+          </div>
+        </div>
+        <AnimatePresence>
+          {result && (
             <motion.div
-              key="result"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="mb-5 p-4 rounded-xl text-center"
+              className="rounded-xl p-4 mb-4 text-center font-bold"
               style={{
                 background: result.win
-                  ? "oklch(0.83 0.19 155 / 0.1)"
-                  : "oklch(0.62 0.25 25 / 0.1)",
-                border: `1px solid ${result.win ? "oklch(0.83 0.19 155 / 0.4)" : "oklch(0.62 0.25 25 / 0.4)"}`,
+                  ? "oklch(0.82 0.19 155 / 0.15)"
+                  : "oklch(0.62 0.25 25 / 0.15)",
+                border: `1px solid ${result.win ? "oklch(0.82 0.19 155 / 0.4)" : "oklch(0.62 0.25 25 / 0.4)"}`,
               }}
+              data-ocid={
+                result.win ? "aviator.success_state" : "aviator.error_state"
+              }
             >
-              <p
-                className="font-bold text-lg"
-                style={{
-                  color: result.win
-                    ? "oklch(0.83 0.19 155)"
-                    : "oklch(0.72 0.25 25)",
-                }}
-                data-ocid={
-                  result.win ? "aviator.success_state" : "aviator.error_state"
-                }
-              >
-                {result.win
-                  ? `✈️ You cashed out at ${targetMultiplier}x! Won ${Number(result.payout).toLocaleString()} coins!`
-                  : `💥 Crashed at ${(Number(result.crashPoint) / 100).toFixed(2)}x before your ${targetMultiplier}x cashout!`}
+              <p className={result.win ? "win-text" : "loss-text"}>
+                {result.win ? `+${result.payout} coins` : "Lost"} —{" "}
+                {result.message}
               </p>
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-5">
-          <div className="flex-1">
-            <label
-              htmlFor="aviator-wager"
-              className="block text-xs uppercase tracking-wider mb-2"
-              style={{ color: "oklch(0.85 0.18 85)" }}
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "oklch(0.11 0.03 264)",
+            border: "1px solid oklch(0.22 0.04 264)",
+          }}
+        >
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label
+                htmlFor="aviator-wager"
+                className="text-xs text-muted-foreground uppercase tracking-wider block mb-1"
+              >
+                Wager (coins)
+              </label>
+              <input
+                id="aviator-wager"
+                type="number"
+                value={wager}
+                onChange={(e) => setWager(e.target.value)}
+                min="1"
+                className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none border"
+                style={{
+                  background: "oklch(0.15 0.03 264)",
+                  borderColor: "oklch(0.28 0.05 264)",
+                }}
+                data-ocid="aviator.input"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="aviator-multiplier"
+                className="text-xs text-muted-foreground uppercase tracking-wider block mb-1"
+              >
+                Target Multiplier
+              </label>
+              <input
+                id="aviator-multiplier"
+                type="number"
+                value={targetMultiplier}
+                onChange={(e) => setTargetMultiplier(e.target.value)}
+                step="0.1"
+                min="1.1"
+                className="w-full rounded-lg px-3 py-2.5 text-sm text-white outline-none border"
+                style={{
+                  background: "oklch(0.15 0.03 264)",
+                  borderColor: "oklch(0.28 0.05 264)",
+                }}
+                data-ocid="aviator.input"
+              />
+            </div>
+          </div>
+          {phase === "waiting" && (
+            <button
+              type="button"
+              onClick={handleBet}
+              disabled={loading}
+              className="w-full py-4 rounded-xl font-extrabold text-lg btn-neon-green transition-all disabled:opacity-50"
+              data-ocid="aviator.primary_button"
             >
-              Wager
-            </label>
-            <input
-              id="aviator-wager"
-              data-ocid="aviator.wager.input"
-              type="number"
-              min={10}
-              value={wager}
-              onChange={(e) => setWager(Math.max(10, Number(e.target.value)))}
-              disabled={gameState === "flying"}
-              className="w-full px-4 py-2 rounded-lg text-white bg-transparent outline-none"
+              ✈️ FLY / BET
+            </button>
+          )}
+          {(phase === "cashed" || phase === "crashed") && (
+            <button
+              type="button"
+              onClick={reset}
+              className="w-full py-4 rounded-xl font-extrabold text-lg btn-neon-cyan transition-all"
+              data-ocid="aviator.secondary_button"
+            >
+              Play Again
+            </button>
+          )}
+          {phase === "flying" && (
+            <button
+              type="button"
+              disabled
+              className="w-full py-4 rounded-xl font-extrabold text-lg opacity-50 cursor-not-allowed"
               style={{
-                border: "1px solid oklch(0.62 0.13 78 / 0.4)",
-                background: "oklch(0.08 0 0)",
+                background: "oklch(0.2 0.04 264)",
+                color: "oklch(0.6 0.03 264)",
               }}
-            />
-          </div>
-          <div className="flex-1">
-            <label
-              htmlFor="aviator-target"
-              className="block text-xs uppercase tracking-wider mb-2"
-              style={{ color: "oklch(0.85 0.18 85)" }}
             >
-              Target Cashout:{" "}
-              <span style={{ color: "oklch(0.90 0.19 85)" }}>
-                {targetMultiplier.toFixed(1)}x
-              </span>
-            </label>
-            <input
-              id="aviator-target"
-              data-ocid="aviator.target.input"
-              type="range"
-              min={1.1}
-              max={10.0}
-              step={0.1}
-              value={targetMultiplier}
-              onChange={(e) => setTargetMultiplier(Number(e.target.value))}
-              disabled={gameState === "flying"}
-              className="w-full accent-yellow-400"
-            />
-          </div>
+              Flying...
+            </button>
+          )}
         </div>
-
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs text-muted-foreground">
-            Balance:{" "}
-            <span style={{ color: "oklch(0.85 0.18 85)" }}>
-              {session ? session.balance.toLocaleString() : "—"} coins
-            </span>
-          </span>
-        </div>
-
-        {gameState === "result" ? (
-          <button
-            type="button"
-            data-ocid="aviator.play_again.button"
-            onClick={handlePlayAgain}
-            className="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-sm transition-opacity hover:opacity-90"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.62 0.13 78))",
-              color: "oklch(0.07 0 0)",
-            }}
-          >
-            Fly Again
-          </button>
-        ) : (
-          <motion.button
-            type="button"
-            data-ocid="aviator.fly.primary_button"
-            onClick={handleFly}
-            disabled={gameState === "flying" || wager < 10}
-            animate={
-              gameState === "idle"
-                ? {
-                    boxShadow: [
-                      "0 0 20px rgba(212,170,0,0.4)",
-                      "0 0 40px rgba(212,170,0,0.8)",
-                      "0 0 20px rgba(212,170,0,0.4)",
-                    ],
-                  }
-                : {}
-            }
-            transition={{
-              repeat: Number.POSITIVE_INFINITY,
-              duration: 1.6,
-              ease: "easeInOut",
-            }}
-            className="w-full py-5 rounded-xl font-bold uppercase tracking-widest text-lg transition-all disabled:opacity-50"
-            style={{
-              background:
-                gameState === "flying"
-                  ? "linear-gradient(135deg, oklch(0.60 0.13 78), oklch(0.50 0.10 78))"
-                  : "linear-gradient(135deg, oklch(0.87 0.19 85), oklch(0.72 0.16 82), oklch(0.87 0.19 85))",
-              color: "oklch(0.07 0 0)",
-              fontSize: "1.15rem",
-            }}
-          >
-            {gameState === "flying" ? (
-              <span className="flex items-center justify-center gap-2">
-                <motion.span
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{
-                    repeat: Number.POSITIVE_INFINITY,
-                    duration: 0.8,
-                  }}
-                >
-                  ✈️
-                </motion.span>
-                Flying…
-              </span>
-            ) : (
-              "✈️  PLAY NOW"
-            )}
-          </motion.button>
-        )}
       </div>
     </div>
   );
