@@ -2,7 +2,7 @@ import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { getAnonActor } from "../utils/anonActor";
+import { callWithRetry } from "../utils/anonActor";
 
 interface User {
   username: string;
@@ -40,8 +40,9 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const actor = await getAnonActor();
-      const result = await (actor as any).adminGetUsersWithPasswords();
+      const result = await callWithRetry((actor) =>
+        actor.adminGetUsersWithPasswords(),
+      );
       setUsers(
         result.map((u: any) => ({
           username: u.username,
@@ -59,17 +60,21 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const actor = await getAnonActor();
-      const result = await (actor as any).adminGetGameHistory();
+      const result = await callWithRetry((actor) =>
+        actor.adminGetGameHistory(),
+      );
+      const allowed = ["Aviator", "Teen Patti", "Roulette"];
       setHistory(
-        result.map((h: any) => ({
-          username: h.username,
-          game: h.game,
-          wager: Number(h.wager),
-          payout: Number(h.payout),
-          win: h.win,
-          timestamp: Number(h.timestamp),
-        })),
+        result
+          .filter((h: any) => allowed.includes(h.game))
+          .map((h: any) => ({
+            username: h.username,
+            game: h.game,
+            wager: Number(h.wager),
+            payout: Number(h.payout),
+            win: h.win,
+            timestamp: Number(h.timestamp),
+          })),
       );
     } catch (e) {
       console.error("fetchHistory", e);
@@ -96,15 +101,17 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     }
     setSaving(true);
     try {
-      const actor = await getAnonActor();
-      const result = await (actor as any).adminCreateUser(
-        newUsername.trim(),
-        newPassword.trim(),
+      const result = await callWithRetry((actor) =>
+        actor.adminCreateUser(newUsername.trim(), newPassword.trim()),
       );
-      toast.success(result || "User created successfully!");
-      setNewUsername("");
-      setNewPassword("");
-      await fetchUsers();
+      if (result?.toLowerCase().includes("already")) {
+        toast.error(result);
+      } else {
+        toast.success(result || "User created successfully!");
+        setNewUsername("");
+        setNewPassword("");
+        await fetchUsers();
+      }
     } catch (e: any) {
       toast.error(`Save failed: ${e?.message || String(e)}`);
     } finally {
@@ -119,11 +126,12 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     }
     setWalletLoading(true);
     try {
-      const actor = await getAnonActor();
-      const result = await (actor as any).adminAdjustBalance(
-        walletUser,
-        BigInt(Number(walletAmount)),
-        isAdd,
+      const result = await callWithRetry((actor) =>
+        actor.adminAdjustBalance(
+          walletUser,
+          BigInt(Number(walletAmount)),
+          isAdd,
+        ),
       );
       toast.success(result || `Balance ${isAdd ? "added" : "deducted"}.`);
       setWalletAmount("");
@@ -348,7 +356,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
               className="text-sm text-muted-foreground text-center py-6"
               data-ocid="admin.empty_state"
             >
-              No users created yet.
+              {loadingUsers ? "Loading..." : "No users created yet."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -389,7 +397,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                       </td>
                       <td
                         className="py-2.5 px-3 font-mono text-sm"
-                        style={{ color: "oklch(0.75 0.03 264)" }}
+                        style={{ color: "oklch(0.92 0.05 264)" }}
                       >
                         {u.password}
                       </td>

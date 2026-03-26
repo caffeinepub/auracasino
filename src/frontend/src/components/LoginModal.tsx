@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePlayerSession } from "../contexts/PlayerSessionContext";
-import { getAnonActor } from "../utils/anonActor";
+import { callWithRetry } from "../utils/anonActor";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -23,10 +23,8 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
     setLoading(true);
     setError("");
     try {
-      const actor = await getAnonActor();
-      const res = await (actor as any).playerLogin(
-        username.trim(),
-        password.trim(),
+      const res = await callWithRetry((actor) =>
+        actor.playerLogin(username.trim(), password.trim()),
       );
       if (res.success) {
         setSession({
