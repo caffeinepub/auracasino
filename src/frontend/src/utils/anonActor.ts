@@ -1,14 +1,28 @@
-import { createActorWithConfig } from "../config";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
+import { loadConfig } from "../config";
+import { idlFactory } from "../declarations/backend.did";
 
 let _anonActor: any = null;
+let _lastError = 0;
 
-/**
- * Returns a cached backend actor with anonymous identity.
- * Resets the cache on error so a fresh actor is created on the next call.
- */
 export async function getAnonActor(): Promise<any> {
+  // Force fresh actor if last error was recent (within 5s)
+  if (_anonActor && Date.now() - _lastError < 5000) {
+    _anonActor = null;
+  }
   if (!_anonActor) {
-    _anonActor = await createActorWithConfig();
+    const config = await loadConfig();
+    const agent = new HttpAgent({
+      host: config.backend_host,
+    });
+    // Only fetch root key on localhost
+    if (config.backend_host?.includes("localhost")) {
+      await agent.fetchRootKey().catch(console.warn);
+    }
+    _anonActor = Actor.createActor(idlFactory, {
+      agent,
+      canisterId: config.backend_canister_id,
+    });
   }
   return _anonActor;
 }
@@ -18,20 +32,27 @@ export function resetAnonActor() {
 }
 
 /**
- * Calls an actor method and automatically resets + retries once on failure.
- * This handles the case where the canister restarts and the cached actor is stale.
+ * Calls an actor method with automatic retry.
+ * Resets + retries up to 2 times on failure (handles canister restart).
  */
 export async function callWithRetry(
   fn: (actor: any) => Promise<any>,
+  maxRetries = 2,
 ): Promise<any> {
-  try {
-    const actor = await getAnonActor();
-    return await fn(actor);
-  } catch (_e) {
-    // Reset the actor cache so the next call gets a fresh connection
-    resetAnonActor();
-    // Retry once with a fresh actor
-    const actor = await getAnonActor();
-    return await fn(actor);
+  let lastErr: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const actor = await getAnonActor();
+      return await fn(actor);
+    } catch (e: any) {
+      lastErr = e;
+      _lastError = Date.now();
+      resetAnonActor();
+      // Wait before retry: 0ms, 500ms, 1000ms
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, attempt * 500));
+      }
+    }
   }
+  throw lastErr;
 }

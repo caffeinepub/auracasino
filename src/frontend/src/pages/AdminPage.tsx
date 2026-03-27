@@ -23,6 +23,17 @@ interface AdminPageProps {
   onBack: () => void;
 }
 
+const withTimeout = (promise: Promise<any>, ms: number) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Request timed out. Check your connection.")),
+        ms,
+      ),
+    ),
+  ]);
+
 export default function AdminPage({ onBack }: AdminPageProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [history, setHistory] = useState<GameHistoryEntry[]>([]);
@@ -36,6 +47,11 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const [walletLoading, setWalletLoading] = useState(false);
   const historyInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const usersInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reset stale saving state on mount
+  useEffect(() => {
+    setSaving(false);
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -101,8 +117,11 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     }
     setSaving(true);
     try {
-      const result = await callWithRetry((actor) =>
-        actor.adminCreateUser(newUsername.trim(), newPassword.trim()),
+      const result = await withTimeout(
+        callWithRetry((actor) =>
+          actor.adminCreateUser(newUsername.trim(), newPassword.trim()),
+        ),
+        20000,
       );
       if (result?.toLowerCase().includes("already")) {
         toast.error(result);
@@ -126,12 +145,15 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     }
     setWalletLoading(true);
     try {
-      const result = await callWithRetry((actor) =>
-        actor.adminAdjustBalance(
-          walletUser,
-          BigInt(Number(walletAmount)),
-          isAdd,
+      const result = await withTimeout(
+        callWithRetry((actor) =>
+          actor.adminAdjustBalance(
+            walletUser,
+            BigInt(Number(walletAmount)),
+            isAdd,
+          ),
         ),
+        20000,
       );
       toast.success(result || `Balance ${isAdd ? "added" : "deducted"}.`);
       setWalletAmount("");

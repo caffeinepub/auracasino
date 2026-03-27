@@ -98,6 +98,14 @@ export const TeenPattiResult = IDL.Record({
   'dealerRank' : IDL.Nat,
   'message' : IDL.Text,
 });
+export const GameRecord = IDL.Record({
+  'username' : IDL.Text,
+  'game' : IDL.Text,
+  'wager' : IDL.Nat,
+  'payout' : IDL.Nat,
+  'win' : IDL.Bool,
+  'timestamp' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -122,6 +130,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'ping' : IDL.Func([], [IDL.Text], ['query']),
   'playerGetBalance' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
   'playerLogin' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
   'playerPlayAviator' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [AviatorResult], []),
@@ -136,7 +145,7 @@ export const idlService = IDL.Service({
   'playTeenPatti' : IDL.Func([IDL.Nat], [TeenPattiResult], []),
   'register' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'adminGetGameHistory' : IDL.Func([], [IDL.Vec(IDL.Record({'username': IDL.Text, 'game': IDL.Text, 'wager': IDL.Nat, 'payout': IDL.Nat, 'win': IDL.Bool, 'timestamp': IDL.Int}))], ['query']),
+  'adminGetGameHistory' : IDL.Func([], [IDL.Vec(GameRecord)], ['query']),
   'topUp' : IDL.Func([IDL.Nat], [], []),
 });
 
@@ -183,6 +192,19 @@ export const idlFactory = ({ IDL }) => {
   const PlayerWallet = IDL.Record({
     'username' : IDL.Text,
     'balance' : IDL.Nat,
+  });
+  const UserCredential = IDL.Record({
+    'username' : IDL.Text,
+    'password' : IDL.Text,
+    'balance' : IDL.Nat,
+  });
+  const GameRecord = IDL.Record({
+    'username' : IDL.Text,
+    'game' : IDL.Text,
+    'wager' : IDL.Nat,
+    'payout' : IDL.Nat,
+    'win' : IDL.Bool,
+    'timestamp' : IDL.Int,
   });
   const HiLoResult = IDL.Record({
     'win' : IDL.Bool,
@@ -252,6 +274,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'ping' : IDL.Func([], [IDL.Text], ['query']),
     'playerGetBalance' : IDL.Func([IDL.Text, IDL.Text], [IDL.Nat], []),
     'playerLogin' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
     'playerPlayAviator' : IDL.Func([IDL.Text, IDL.Text, IDL.Nat, IDL.Nat], [AviatorResult], []),
@@ -266,8 +289,8 @@ export const idlFactory = ({ IDL }) => {
     'playTeenPatti' : IDL.Func([IDL.Nat], [TeenPattiResult], []),
     'register' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'adminGetGameHistory' : IDL.Func([], [IDL.Vec(IDL.Record({'username': IDL.Text, 'game': IDL.Text, 'wager': IDL.Nat, 'payout': IDL.Nat, 'win': IDL.Bool, 'timestamp': IDL.Int}))], ['query']),
-  'topUp' : IDL.Func([IDL.Nat], [], []),
+    'adminGetGameHistory' : IDL.Func([], [IDL.Vec(GameRecord)], ['query']),
+    'topUp' : IDL.Func([IDL.Nat], [], []),
   });
 };
 
