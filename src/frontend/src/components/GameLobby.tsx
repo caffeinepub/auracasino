@@ -10,11 +10,11 @@ const GAMES = [
     img: "/assets/generated/aviator-card.dim_400x300.jpg",
   },
   {
-    id: "teenpatti",
-    name: "Teen Patti",
+    id: "andarbahr",
+    name: "Andar Bahar",
     badge: "HOT",
     badgeColor: "oklch(0.82 0.19 155)",
-    img: "/assets/generated/teenpatti-card.dim_400x300.jpg",
+    img: "/assets/generated/andar-bahar-thumb.dim_400x300.jpg",
   },
   {
     id: "roulette",

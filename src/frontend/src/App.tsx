@@ -3,10 +3,10 @@ import { useState } from "react";
 import GameLobby from "./components/GameLobby";
 import LoginModal from "./components/LoginModal";
 import Navbar from "./components/Navbar";
+import AndarBaharGame from "./components/games/AndarBaharGame";
 import AviatorGame from "./components/games/AviatorGame";
 import RouletteGame from "./components/games/RouletteGame";
 import SlotsGame from "./components/games/SlotsGame";
-import TeenPattiGame from "./components/games/TeenPattiGame";
 import {
   PlayerSessionProvider,
   usePlayerSession,
@@ -17,7 +17,7 @@ export type GameView =
   | "lobby"
   | "aviator"
   | "roulette"
-  | "teenpatti"
+  | "andarbahr"
   | "slots"
   | "admin";
 
@@ -143,9 +143,9 @@ function AppContent() {
             requireLogin={requireLogin}
           />
         );
-      case "teenpatti":
+      case "andarbahr":
         return (
-          <TeenPattiGame
+          <AndarBaharGame
             onBack={() => setView("lobby")}
             requireLogin={requireLogin}
           />
